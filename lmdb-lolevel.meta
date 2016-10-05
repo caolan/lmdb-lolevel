@@ -1,0 +1,5 @@
+((synopsis "Bindings to LMDB which closely follow C API")
+ (author "Caolan McMahon")
+ (category db)
+ (license "BSD")
+ (test-depends test))

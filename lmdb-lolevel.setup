@@ -1,0 +1,7 @@
+(compile -O2 -d1 -s "lmdb-lolevel.scm" -Iinclude -llmdb -j "lmdb-lolevel")
+(compile -O2 -d0 -s "lmdb-lolevel.import.scm")
+
+(install-extension
+  'lmdb-lolevel
+  '("lmdb-lolevel.so" "lmdb-lolevel.import.so")
+  '((version "1.0.0")))
