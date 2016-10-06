@@ -5,7 +5,10 @@
 ;; Various flags and return codes are also exported (e.g. MDB_NOSYNC),
 ;; see lmdb-defs.
 
-(mdb-env-create
+(mdb-strerror
+ mdb-version
+ mdb-version-string
+ mdb-env-create
  mdb-env-open
  mdb-env-close
  mdb-txn-begin
@@ -109,6 +112,24 @@
    (make-property-condition 'lmdb)
    (make-property-condition (hash-table-ref return-codes code))))
 
+
+(define c-mdb_version
+  (foreign-lambda c-string "mdb_version"
+    (c-pointer int)
+    (c-pointer int)
+    (c-pointer int)))
+
+(define (mdb-version)
+  (let-location ((major int)
+		 (minor int)
+		 (patch int))
+    (c-mdb_version (location major)
+		   (location minor)
+		   (location patch))
+    (vector major minor patch)))
+
+(define (mdb-version-string)
+  (c-mdb_version #f #f #f))
 
 (define mdb-strerror
   (foreign-lambda c-string "mdb_strerror" int))

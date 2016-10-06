@@ -1,3 +1,4 @@
 *.so
 *.o
 /lmdb-lolevel.import.scm
+/tests/testdb
