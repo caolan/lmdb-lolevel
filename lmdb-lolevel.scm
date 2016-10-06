@@ -10,6 +10,7 @@
  mdb-version-string
  mdb-env-create
  mdb-env-open
+ mdb-env-copy
  mdb-env-close
  mdb-txn-begin
  mdb-txn-commit
@@ -20,7 +21,7 @@
  mdb-put)
 
 (import chicken scheme foreign)
-(use srfi-69 lolevel)
+(use srfi-69 lolevel data-structures)
 
 (foreign-declare "#include <lmdb.h>")
 (foreign-declare "#include <errno.h>")
@@ -97,12 +98,11 @@
 ;; anything other than MDB_SUCCESS is returned, a scheme (abort)
 ;; occurs with an appropriate lmdb condition.
 
-(define-syntax check-return
-  (syntax-rules ()
-    ((_ location (name args ...))
-     (let ((code (name args ...)))
-       (when (not (fx= code MDB_SUCCESS))
-	 (abort (lmdb-condition location code)))))))
+(define (check-return location f)
+  (compose (lambda (code)
+	     (when (not (fx= code MDB_SUCCESS))
+	       (abort (lmdb-condition location code))))
+	   f))
 
 (define (lmdb-condition name code)
   (make-composite-condition
@@ -138,12 +138,13 @@
 ;; Environment
 
 (define c-mdb_env_create
-  (foreign-lambda int "mdb_env_create"
-    (c-pointer (c-pointer (struct MDB_env)))))
+  (check-return 'mdb-env-create
+   (foreign-lambda int "mdb_env_create"
+     (c-pointer (c-pointer (struct MDB_env))))))
 
 (define (mdb-env-create)
   (let-location ((p (c-pointer (struct MDB_env))))
-    (check-return 'mdb-env-create (c-mdb_env_create (location p)))
+    (c-mdb_env_create (location p))
     (tag-pointer p 'MDB_env)))
 
 ;; for mdb-env-open mode argument use bitwise-ior with perm/... values
@@ -156,11 +157,18 @@
 ;; perm/isvtx perm/isuid perm/isgid
 
 (define mdb-env-open
-  (foreign-lambda int "mdb_env_open"
-    (c-pointer (struct MDB_env))
-    (const c-string)
-    unsigned-int
-    int))
+  (check-return 'mdb-env-open
+   (foreign-lambda int "mdb_env_open"
+     (c-pointer (struct MDB_env))
+     (const c-string)
+     unsigned-int
+     int)))
+
+(define mdb-env-copy
+  (check-return 'mdb-env-copy
+   (foreign-lambda int "mdb_env_copy"
+     (c-pointer (struct MDB_env))
+     (const c-string))))
 
 (define mdb-env-close
   (foreign-lambda void "mdb_env_close"
@@ -170,50 +178,47 @@
 ;; Transaction
 
 (define c-mdb_txn_begin
-  (foreign-lambda int "mdb_txn_begin"
-    (c-pointer (struct MDB_env))
-    (c-pointer (struct MDB_txn))
-    unsigned-int
-    (c-pointer (c-pointer (struct MDB_txn)))))
+  (check-return 'mdb-txn-begin
+   (foreign-lambda int "mdb_txn_begin"
+     (c-pointer (struct MDB_env))
+     (c-pointer (struct MDB_txn))
+     unsigned-int
+     (c-pointer (c-pointer (struct MDB_txn))))))
 
 (define (mdb-txn-begin env parent flags)
   (let-location ((p (c-pointer (struct MDB_txn))))
-    (check-return 'mdb-txn-begin
-		  (c-mdb_txn_begin env
-				   (and parent parent)
-				   flags
-				   (location p)))
+    (c-mdb_txn_begin env (and parent parent) flags (location p))
     (tag-pointer p 'MDB_txn)))
 
 (define mdb-txn-commit
-  (foreign-lambda int "mdb_txn_commit" (c-pointer (struct MDB_txn))))
+  (check-return 'mdb-txn-commit
+   (foreign-lambda int "mdb_txn_commit" (c-pointer (struct MDB_txn)))))
 
 (define mdb-txn-abort
-  (foreign-lambda void "mdb_txn_abort" (c-pointer (struct MDB_txn))))
+  (check-return 'mdb-txn-abort
+   (foreign-lambda void "mdb_txn_abort" (c-pointer (struct MDB_txn)))))
 
 
 ;; Database
 
 (define c-mdb_dbi_open
-  (foreign-lambda int "mdb_dbi_open"
-    (c-pointer (struct MDB_txn))
-    (const c-string)
-    unsigned-int
-    (c-pointer unsigned-int)))
+  (check-return 'mdb-dbi-open
+   (foreign-lambda int "mdb_dbi_open"
+     (c-pointer (struct MDB_txn))
+     (const c-string)
+     unsigned-int
+     (c-pointer unsigned-int))))
 
 (define (mdb-dbi-open txn name flags)
   (let-location ((h unsigned-int))
-    (check-return 'mdb-dbi-open
-		  (c-mdb_dbi_open txn
-				  name
-				  flags
-				  (location h)))
+    (c-mdb_dbi_open txn name flags (location h))
     h))
 
 (define mdb-dbi-close
-  (foreign-lambda void "mdb_dbi_close"
-    (c-pointer (struct MDB_env))
-    unsigned-int))
+  (check-return 'mdb-dbi-close
+   (foreign-lambda void "mdb_dbi_close"
+     (c-pointer (struct MDB_env))
+     unsigned-int)))
 
 
 ;; Data
@@ -225,64 +230,64 @@
     size_t))
 		  
 (define c-mdb_get
-  (foreign-lambda* int
-    (((c-pointer (struct MDB_txn)) txn)
-     (unsigned-int dbi)
-     (c-pointer key_data)
-     (size_t key_size)
-     ((c-pointer c-pointer) val_data)
-     ((c-pointer size_t) val_size))
-    "MDB_val key, data;
-     int ret;
-     key.mv_data = key_data;
-     key.mv_size = key_size;
-     if ((ret = mdb_get(txn, dbi, &key, &data))) {
-         C_return(ret);
-     }
-     else {
-         *val_data = data.mv_data;
-         *val_size = data.mv_size;
-         C_return(0);
-     }"))
+  (check-return 'mdb-get
+   (foreign-lambda* int
+       (((c-pointer (struct MDB_txn)) txn)
+	(unsigned-int dbi)
+	(c-pointer key_data)
+	(size_t key_size)
+	((c-pointer c-pointer) val_data)
+	((c-pointer size_t) val_size))
+     "MDB_val key, data;
+      int ret;
+      key.mv_data = key_data;
+      key.mv_size = key_size;
+      if ((ret = mdb_get(txn, dbi, &key, &data))) {
+          C_return(ret);
+      }
+      else {
+          *val_data = data.mv_data;
+          *val_size = data.mv_size;
+          C_return(0);
+      }")))
 
 (define (mdb-get txn dbi key)
   (let-location ((val_data c-pointer)
 		 (val_size size_t))
-    (check-return 'mdb-get
-		  (c-mdb_get txn
-			     dbi
-			     (location key)
-			     (string-length key)
-			     (location val_data)
-			     (location val_size)))
+    (c-mdb_get txn
+	       dbi
+	       (location key)
+	       (string-length key)
+	       (location val_data)
+	       (location val_size))
     (let ((data (make-string val_size)))
       (memcpy (location data) val_data val_size)
       data)))
 
 (define c-mdb_put
-  (foreign-lambda* int
-    (((c-pointer (struct MDB_txn)) txn)
-     (unsigned-int dbi)
-     (c-pointer key_data)
-     (size_t key_size)
-     (c-pointer val_data)
-     (size_t val_size)
-     (unsigned-int flags))
-    "MDB_val key, val;
-     key.mv_size = key_size;
-     key.mv_data = key_data;
-     val.mv_size = val_size;
-     val.mv_data = val_data;
-     C_return(mdb_put(txn, dbi, &key, &val, flags));"))
-
-(define (mdb-put txn dbi key data flags)
   (check-return 'mdb-put
-		(c-mdb_put txn
-			   dbi
-			   (location key)
-			   (string-length key)
-			   (location data)
-			   (string-length data)
-			   flags)))
-     
+   (foreign-lambda* int
+       (((c-pointer (struct MDB_txn)) txn)
+	(unsigned-int dbi)
+	(c-pointer key_data)
+	(size_t key_size)
+	(c-pointer val_data)
+	(size_t val_size)
+	(unsigned-int flags))
+     "MDB_val key, val;
+      key.mv_size = key_size;
+      key.mv_data = key_data;
+      val.mv_size = val_size;
+      val.mv_data = val_data;
+      C_return(mdb_put(txn, dbi, &key, &val, flags));")))
+  
+(define (mdb-put txn dbi key data flags)
+  (c-mdb_put txn
+	     dbi
+	     (location key)
+	     (string-length key)
+	     (location data)
+	     (string-length data)
+	     flags))
+
 )
