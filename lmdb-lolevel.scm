@@ -28,6 +28,25 @@
 (foreign-declare "#include <errno.h>")
 
 
+;; Record types
+
+;; These give print nicely in the REPL and some type protection over
+;; plain pointers. In my tests they also incur slightly less overhead
+;; than tagged-pointers with a tagged-pointer? check.
+
+(define-record mdb-env pointer)
+(define-record-printer (mdb-env x port)
+  (fprintf port "#<mdb-env ~S>" (mdb-env-pointer x)))
+
+(define-record mdb-txn pointer)
+(define-record-printer (mdb-txn x port)
+  (fprintf port "#<mdb-txn ~S>" (mdb-txn-pointer x)))
+
+(define-record mdb-dbi handle)
+(define-record-printer (mdb-dbi x port)
+  (fprintf port "#<mdb-dbi ~S>" (mdb-dbi-handle x)))
+
+
 ;; This macro creates a variable associated with each foreign integer
 ;; and a hash-map which maps the integer back to a symbol - useful for
 ;; constructing error conditions.
@@ -106,15 +125,6 @@
        (when (not (fx= code MDB_SUCCESS))
 	 (abort (lmdb-condition location code)))))))
 
-(define (check-tag location type pointer)
-  (unless (tagged-pointer? pointer type)
-    (abort (make-composite-condition
-	    (make-property-condition
-	     'exn
-	     'message (sprintf "Invalid pointer tag, expected ~A" type)
-	     'location location)
-	    (make-property-condition 'type)))))
-
 (define (lmdb-condition name code)
   (make-composite-condition
    (make-property-condition 'exn
@@ -155,7 +165,7 @@
 (define (mdb-env-create)
   (let-location ((p (c-pointer (struct MDB_env))))
     (check-return 'mdb-env-create (c-mdb_env_create (location p)))
-    (tag-pointer p 'MDB_env)))
+    (make-mdb-env p)))
 
 ;; for mdb-env-open mode argument use bitwise-ior with perm/... values
 ;; from posix module:
@@ -174,8 +184,7 @@
     int))
 
 (define (mdb-env-open env path flags mode)
-  (check-tag 'mdb-env-open 'MDB_env env)
-  (check-return 'mdb-env-open (c-mdb_env_open env path flags mode)))
+  (check-return 'mdb-env-open (c-mdb_env_open (mdb-env-pointer env) path flags mode)))
 
 (define c-mdb_env_copy
   (foreign-lambda int "mdb_env_copy"
@@ -183,16 +192,14 @@
     (const c-string)))
 
 (define (mdb-env-copy env path)
-  (check-tag 'mdb-env-copy 'MDB_env env)
-  (check-return 'mdb-env-copy (c-mdb_env_copy env path)))
+  (check-return 'mdb-env-copy (c-mdb_env_copy (mdb-env-pointer env) path)))
 
 (define c-mdb_env_close
   (foreign-lambda void "mdb_env_close"
     (c-pointer (struct MDB_env))))
 
 (define (mdb-env-close env)
-  (check-tag 'mdb-env-close 'MDB_env env)
-  (c-mdb_env_close env))
+  (c-mdb_env_close (mdb-env-pointer env)))
 
 
 ;; Transaction
@@ -205,26 +212,23 @@
     (c-pointer (c-pointer (struct MDB_txn)))))
 
 (define (mdb-txn-begin env parent flags)
-  (check-tag 'mdb-txn-begin 'MDB_env env)
   (let-location ((p (c-pointer (struct MDB_txn))))
     (check-return
      'mdb-txn-begin
-     (c-mdb_txn_begin env (and parent parent) flags (location p)))
-    (tag-pointer p 'MDB_txn)))
+     (c-mdb_txn_begin (mdb-env-pointer env) (and parent parent) flags (location p)))
+    (make-mdb-txn p)))
 
 (define c-mdb_txn_commit
   (foreign-lambda int "mdb_txn_commit" (c-pointer (struct MDB_txn))))
 
 (define (mdb-txn-commit txn)
-  (check-tag 'mdb-txn-commit 'MDB_txn txn)
-  (check-return 'mdb-txn-commit (c-mdb_txn_commit txn)))
+  (check-return 'mdb-txn-commit (c-mdb_txn_commit (mdb-txn-pointer txn))))
 
 (define c-mdb_txn_abort
   (foreign-lambda void "mdb_txn_abort" (c-pointer (struct MDB_txn))))
 
 (define (mdb-txn-abort txn)
-  (check-tag 'mdb-txn-abort 'MDB_txn txn)
-  (c-mdb_txn_abort txn))
+  (c-mdb_txn_abort (mdb-txn-pointer txn)))
 
 
 ;; Database
@@ -237,10 +241,9 @@
     (c-pointer unsigned-int)))
 
 (define (mdb-dbi-open txn name flags)
-  (check-tag 'mdb-dbi-open 'MDB_txn txn)
   (let-location ((h unsigned-int))
-    (check-return 'mdb-dbi-open (c-mdb_dbi_open txn name flags (location h)))
-    h))
+    (check-return 'mdb-dbi-open (c-mdb_dbi_open (mdb-txn-pointer txn) name flags (location h)))
+    (make-mdb-dbi h)))
 
 (define c-mdb_dbi_close
   (foreign-lambda void "mdb_dbi_close"
@@ -248,8 +251,7 @@
     unsigned-int))
 
 (define (mdb-dbi-close env dbi)
-  (check-tag 'mdb-dbi-close 'MDB_env env)
-  (c-mdb_dbi_close env dbi))
+  (c-mdb_dbi_close (mdb-env-pointer env) (mdb-dbi-handle dbi)))
 
 
 ;; Data
@@ -283,12 +285,11 @@
      }"))
 
 (define (mdb-get txn dbi key)
-  (check-tag 'mdb-get 'MDB_txn txn)
   (let-location ((val_data c-pointer)
 		 (val_size size_t))
     (check-return 'mdb-get
-		  (c-mdb_get txn
-			     dbi
+		  (c-mdb_get (mdb-txn-pointer txn)
+			     (mdb-dbi-handle dbi)
 			     key
 			     (location val_data)
 			     (location val_size)))
@@ -313,10 +314,9 @@
      C_return(mdb_put(txn, dbi, &k, &v, flags));"))
   
 (define (mdb-put txn dbi key data flags)
-  (check-tag 'mdb-get 'MDB_txn txn)
   (check-return 'mdb-put
-		(c-mdb_put txn
-			   dbi
+		(c-mdb_put (mdb-txn-pointer txn)
+			   (mdb-dbi-handle dbi)
 			   key
 			   data
 			   flags)))
@@ -343,10 +343,9 @@
      }"))
 
 (define (mdb-del txn dbi key #!optional data)
-  (check-tag 'mdb-del 'MDB_txn txn)
   (check-return 'mdb-del (c-mdb_del
-			  txn
-			  dbi
+			  (mdb-txn-pointer txn)
+			  (mdb-dbi-handle dbi)
 			  (location key)
 			  (string-length key)
 			  (and data (location data))
