@@ -1,4 +1,4 @@
-(compile -O2 -d1 -s "lmdb-lolevel.scm" -Iinclude -llmdb -j "lmdb-lolevel")
+(compile -O2 -d1 -inline -s "lmdb-lolevel.scm" -Iinclude -llmdb -j "lmdb-lolevel")
 (compile -O2 -d0 -s "lmdb-lolevel.import.scm")
 
 (install-extension

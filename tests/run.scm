@@ -86,6 +86,60 @@
       (mdb-txn-commit txn))
     (mdb-env-close env)))
 
+(test-group "check invalid pointer tags"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (test "mdb-env-open"
+	    "Invalid pointer tag, expected MDB_env"
+	    (condition-case (mdb-env-open txn "tests/testdb2" 0 0)
+	      (e (exn type) ((condition-property-accessor 'exn 'message) e))))
+      (test "mdb-env-copy"
+	    "Invalid pointer tag, expected MDB_env"
+	    (condition-case (mdb-env-copy txn "tests/testdb2")
+	      (e (exn type) ((condition-property-accessor 'exn 'message) e))))
+      (test "mdb-env-close"
+	    "Invalid pointer tag, expected MDB_env"
+	    (condition-case (mdb-env-close txn)
+	      (e (exn type) ((condition-property-accessor 'exn 'message) e))))
+      (test "mdb-txn-begin"
+	    "Invalid pointer tag, expected MDB_env"
+	    (condition-case (mdb-txn-begin txn #f 0)
+	      (e (exn type) ((condition-property-accessor 'exn 'message) e))))
+      (test "mdb-txn-commit"
+	    "Invalid pointer tag, expected MDB_txn"
+	    (condition-case (mdb-txn-commit env)
+	      (e (exn type) ((condition-property-accessor 'exn 'message) e))))
+      (test "mdb-txn-abort"
+	    "Invalid pointer tag, expected MDB_txn"
+	    (condition-case (mdb-txn-abort env)
+	      (e (exn type) ((condition-property-accessor 'exn 'message) e))))
+      (test "mdb-dbi-open"
+	    "Invalid pointer tag, expected MDB_txn"
+	    (condition-case (mdb-dbi-open env #f 0)
+	      (e (exn type) ((condition-property-accessor 'exn 'message) e))))
+      (test "mdb-dbi-close"
+	    "Invalid pointer tag, expected MDB_env"
+	    (condition-case (mdb-dbi-close txn "test")
+	      (e (exn type) ((condition-property-accessor 'exn 'message) e))))
+      (test "mdb-put"
+	    "Invalid pointer tag, expected MDB_txn"
+	    (condition-case (mdb-put env dbi "foo" "bar" 0)
+	      (e (exn type) ((condition-property-accessor 'exn 'message) e))))
+      (test "mdb-get"
+	    "Invalid pointer tag, expected MDB_txn"
+	    (condition-case (mdb-get env dbi "foo")
+	      (e (exn type) ((condition-property-accessor 'exn 'message) e))))
+      (test "mdb-del"
+	    "Invalid pointer tag, expected MDB_txn"
+	    (condition-case (mdb-del env dbi "foo")
+	      (e (exn type) ((condition-property-accessor 'exn 'message) e))))
+      (mdb-txn-abort txn))
+    (mdb-env-close env)))
+
 (test-group "copy environment to filename"
   (clear-testdb)
   (let ((env (mdb-env-create)))
@@ -108,6 +162,35 @@
 	   (dbi (mdb-dbi-open txn #f 0)))
       (test "one" (mdb-get txn dbi "foo"))
       (test "two" (mdb-get txn dbi "bar"))
+      (mdb-txn-commit txn))
+    (mdb-env-close env)))
+
+(test-group "mdb-del"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (mdb-put txn dbi "foo" "one" 0)
+      (mdb-put txn dbi "bar" "two" 0)
+      (mdb-txn-commit txn))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (test "one" (mdb-get txn dbi "foo"))
+      (test "two" (mdb-get txn dbi "bar"))
+      (mdb-del txn dbi "bar")
+      (test "one" (mdb-get txn dbi "foo"))
+      (test 'not-found
+	    (condition-case (mdb-get txn dbi "bar")
+	      ((exn lmdb MDB_NOTFOUND) 'not-found)))
+      (mdb-txn-commit txn))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (test "one" (mdb-get txn dbi 123))
+      (test 'not-found
+	    (condition-case (mdb-get txn dbi "bar")
+	      ((exn lmdb MDB_NOTFOUND) 'not-found)))
       (mdb-txn-commit txn))
     (mdb-env-close env)))
 
