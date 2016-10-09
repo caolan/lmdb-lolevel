@@ -11,6 +11,12 @@
  mdb-env-create
  mdb-env-open
  mdb-env-copy
+ mdb-env-copyfd
+ ;mdb-env-copy2
+ ;mdb-env-copyfd2
+ ;mdb_env_stat
+ ;mdb_env_info
+ ;mdb_env_sync
  mdb-env-close
  mdb-txn-begin
  mdb-txn-commit
@@ -184,7 +190,8 @@
     int))
 
 (define (mdb-env-open env path flags mode)
-  (check-return 'mdb-env-open (c-mdb_env_open (mdb-env-pointer env) path flags mode)))
+  (check-return 'mdb-env-open
+		(c-mdb_env_open (mdb-env-pointer env) path flags mode)))
 
 (define c-mdb_env_copy
   (foreign-lambda int "mdb_env_copy"
@@ -192,7 +199,17 @@
     (const c-string)))
 
 (define (mdb-env-copy env path)
-  (check-return 'mdb-env-copy (c-mdb_env_copy (mdb-env-pointer env) path)))
+  (check-return 'mdb-env-copy
+		(c-mdb_env_copy (mdb-env-pointer env) path)))
+
+(define c-mdb_env_copyfd
+  (foreign-lambda int "mdb_env_copyfd"
+    (c-pointer (struct MDB_env))
+    int))
+
+(define (mdb-env-copyfd env fd)
+  (check-return 'mdb-env-copyfd
+		(c-mdb_env_copyfd (mdb-env-pointer env) fd)))
 
 (define c-mdb_env_close
   (foreign-lambda void "mdb_env_close"
