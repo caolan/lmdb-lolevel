@@ -28,7 +28,7 @@
  mdb-envinfo-last-txnid
  mdb-envinfo-maxreaders
  mdb-envinfo-numreaders
- ;mdb_env_sync
+ mdb-env-sync
  mdb-env-close
  mdb-txn-begin
  mdb-txn-commit
@@ -347,6 +347,17 @@
      last-txnid
      maxreaders
      numreaders)))
+
+(define c-mdb_env_sync
+  (foreign-lambda int "mdb_env_sync"
+    (c-pointer (struct MDB_env))
+    int))
+
+(define (mdb-env-sync env force)
+  (check-return 'mdb-env-sync
+		(c-mdb_env_sync
+		 (mdb-env-pointer env)
+		 force)))
   
 (define c-mdb_env_close
   (foreign-lambda void "mdb_env_close"

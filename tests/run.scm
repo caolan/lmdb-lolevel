@@ -316,6 +316,20 @@
       (test-assert (number? (mdb-envinfo-numreaders info))))
     (mdb-env-close env)))
 
+(test-group "mdb-env-sync"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" MDB_NOSYNC
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (mdb-put txn dbi "foo" "one" 0)
+      (mdb-put txn dbi "bar" "two" 0)
+      (mdb-txn-commit txn))
+    ;; no asserts, just checking this runs without an exception for now
+    (mdb-env-sync env 1)
+    (mdb-env-close env)))
+
 (test-group "mdb-del"
   (clear-testdb)
   (let ((env (mdb-env-create)))
