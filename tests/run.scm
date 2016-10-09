@@ -296,6 +296,26 @@
       (test 2 (mdb-stat-entries stat)))
     (mdb-env-close env)))
 
+
+(test-group "mdb-env-info"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (mdb-put txn dbi "foo" "one" 0)
+      (mdb-put txn dbi "bar" "two" 0)
+      (mdb-txn-commit txn))
+    (let ((info (mdb-env-info env)))
+      (test-assert (not (mdb-envinfo-mapaddr info))) ;; NULL pointer
+      (test-assert (number? (mdb-envinfo-mapsize info)))
+      (test-assert (number? (mdb-envinfo-last-pgno info)))
+      (test-assert (number? (mdb-envinfo-last-txnid info)))
+      (test-assert (number? (mdb-envinfo-maxreaders info)))
+      (test-assert (number? (mdb-envinfo-numreaders info))))
+    (mdb-env-close env)))
+
 (test-group "mdb-del"
   (clear-testdb)
   (let ((env (mdb-env-create)))

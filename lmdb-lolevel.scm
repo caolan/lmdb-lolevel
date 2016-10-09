@@ -21,7 +21,13 @@
  mdb-stat-leaf-pages
  mdb-stat-overflow-pages
  mdb-stat-entries
- ;mdb_env_info
+ mdb-env-info
+ mdb-envinfo-mapaddr
+ mdb-envinfo-mapsize
+ mdb-envinfo-last-pgno
+ mdb-envinfo-last-txnid
+ mdb-envinfo-maxreaders
+ mdb-envinfo-numreaders
  ;mdb_env_sync
  mdb-env-close
  mdb-txn-begin
@@ -290,6 +296,57 @@
      leaf-pages
      overflow-pages
      entries)))
+
+(define-record mdb-envinfo
+  mapaddr mapsize last-pgno last-txnid maxreaders numreaders)
+
+(define c-mdb_env_info
+  (foreign-lambda* int
+      (((c-pointer (struct MDB_env)) env)
+       ((c-pointer c-pointer) mapaddr)
+       ((c-pointer size_t) mapsize)
+       ((c-pointer size_t) last_pgno)
+       ((c-pointer size_t) last_txnid)
+       ((c-pointer unsigned-int) maxreaders)
+       ((c-pointer unsigned-int) numreaders))
+    "MDB_envinfo info;
+     int ret;
+     if ((ret = mdb_env_info(env, &info))) {
+       C_return(ret);
+     }
+     else {
+       *mapaddr = info.me_mapaddr;
+       *mapsize = info.me_mapsize;
+       *last_pgno = info.me_last_pgno;
+       *last_txnid = info.me_last_txnid;
+       *maxreaders = info.me_maxreaders;
+       *numreaders = info.me_numreaders;
+       C_return(0);
+     }"))
+
+(define (mdb-env-info env)
+  (let-location ((mapaddr c-pointer)
+		 (mapsize size_t)
+		 (last-pgno size_t)
+		 (last-txnid size_t)
+		 (maxreaders unsigned-int)
+		 (numreaders unsigned-int))
+    (check-return 'mdb-env-info
+		  (c-mdb_env_info
+		   (mdb-env-pointer env)
+		   (location mapaddr)
+		   (location mapsize)
+		   (location last-pgno)
+		   (location last-txnid)
+		   (location maxreaders)
+		   (location numreaders)))
+    (make-mdb-envinfo
+     mapaddr
+     mapsize
+     last-pgno
+     last-txnid
+     maxreaders
+     numreaders)))
   
 (define c-mdb_env_close
   (foreign-lambda void "mdb_env_close"
