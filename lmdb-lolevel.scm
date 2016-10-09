@@ -13,8 +13,14 @@
  mdb-env-copy
  mdb-env-copyfd
  mdb-env-copy2
- ;mdb-env-copyfd2
- ;mdb_env_stat
+ mdb-env-copyfd2
+ mdb-env-stat
+ mdb-stat-psize
+ mdb-stat-depth
+ mdb-stat-branch-pages
+ mdb-stat-leaf-pages
+ mdb-stat-overflow-pages
+ mdb-stat-entries
  ;mdb_env_info
  ;mdb_env_sync
  mdb-env-close
@@ -224,6 +230,67 @@
   (check-return 'mdb-env-copy2
 		(c-mdb_env_copy2 (mdb-env-pointer env) path flags)))
 
+(define c-mdb_env_copyfd2
+  (foreign-lambda int "mdb_env_copyfd2"
+    (c-pointer (struct MDB_env))
+    int
+    unsigned-int))
+
+(define (mdb-env-copyfd2 env fd flags)
+  (check-return 'mdb-env-copyfd2
+		(c-mdb_env_copyfd2 (mdb-env-pointer env) fd flags)))
+
+(define-record mdb-stat
+  psize depth branch-pages leaf-pages overflow-pages entries)
+
+(define c-mdb_env_stat
+  (foreign-lambda* int
+      (((c-pointer (struct MDB_env)) env)
+       ((c-pointer unsigned-int) psize)
+       ((c-pointer unsigned-int) depth)
+       ((c-pointer size_t) branch_pages)
+       ((c-pointer size_t) leaf_pages)
+       ((c-pointer size_t) overflow_pages)
+       ((c-pointer size_t) entries))
+    "MDB_stat stat;
+     int ret;
+     if ((ret = mdb_env_stat(env, &stat))) {
+       C_return(ret);
+     }
+     else {
+       *psize = stat.ms_psize;
+       *depth = stat.ms_depth;
+       *branch_pages = stat.ms_branch_pages;
+       *leaf_pages = stat.ms_leaf_pages;
+       *overflow_pages = stat.ms_overflow_pages;
+       *entries = stat.ms_entries;
+       C_return(0);
+     }"))
+
+(define (mdb-env-stat env)
+  (let-location ((psize unsigned-int)
+		 (depth unsigned-int)
+		 (branch-pages size_t)
+		 (leaf-pages size_t)
+		 (overflow-pages size_t)
+		 (entries size_t))
+    (check-return 'mdb-env-stat
+		  (c-mdb_env_stat
+		   (mdb-env-pointer env)
+		   (location psize)
+		   (location depth)
+		   (location branch-pages)
+		   (location leaf-pages)
+		   (location overflow-pages)
+		   (location entries)))
+    (make-mdb-stat
+     psize
+     depth
+     branch-pages
+     leaf-pages
+     overflow-pages
+     entries)))
+  
 (define c-mdb_env_close
   (foreign-lambda void "mdb_env_close"
     (c-pointer (struct MDB_env))))
