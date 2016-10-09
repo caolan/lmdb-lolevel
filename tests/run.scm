@@ -97,9 +97,17 @@
 	    'bad-arg
 	    (condition-case (mdb-env-open txn "tests/testdb2" 0 0)
 	      ((exn type) 'bad-arg)))
-      (test "mdb-env-copy"
+       (test "mdb-env-copy"
 	    'bad-arg
 	    (condition-case (mdb-env-copy txn "tests/testdb2")
+	      ((exn type) 'bad-arg)))
+       (test "mdb-env-copyfd"
+	    'bad-arg
+	    (condition-case (mdb-env-copyfd txn 0)
+	      ((exn type) 'bad-arg)))
+       (test "mdb-env-copy2"
+	    'bad-arg
+	    (condition-case (mdb-env-copy2 txn "tests/testdb2" 0)
 	      ((exn type) 'bad-arg)))
       (test "mdb-env-close"
 	    'bad-arg
@@ -194,6 +202,40 @@
       (test "two" (mdb-get txn dbi "bar"))
       (mdb-txn-commit txn))
     (mdb-env-close env)))
+
+(test-group "copy environment to filename with compaction"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (mdb-put txn dbi "foo" "one" 0)
+      (mdb-put txn dbi "bar" "two" 0)
+      (mdb-put txn dbi "baz" "three" 0)
+      (mdb-put txn dbi "qux" "four" 0)
+      (mdb-txn-commit txn))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (mdb-del txn dbi "baz")
+      (mdb-del txn dbi "qux")
+      (mdb-txn-commit txn))
+    (when (file-exists? "tests/testdb2")
+      (delete-directory "tests/testdb2" #t))
+    (create-directory "tests/testdb2")
+    (mdb-env-copy2 env "tests/testdb2" MDB_CP_COMPACT)
+    (mdb-env-close env))
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb2" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (test "one" (mdb-get txn dbi "foo"))
+      (test "two" (mdb-get txn dbi "bar"))
+      (mdb-txn-commit txn))
+    (mdb-env-close env))
+  (test-assert (> (file-size "tests/testdb/data.mdb")
+		  (file-size "tests/testdb2/data.mdb"))))
 
 (test-group "mdb-del"
   (clear-testdb)

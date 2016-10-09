@@ -12,7 +12,7 @@
  mdb-env-open
  mdb-env-copy
  mdb-env-copyfd
- ;mdb-env-copy2
+ mdb-env-copy2
  ;mdb-env-copyfd2
  ;mdb_env_stat
  ;mdb_env_info
@@ -119,6 +119,9 @@
  ENOSPC
  EIO)
 
+;; Copy Flags
+(lmdb-defs copy-flags
+ MDB_CP_COMPACT)
 
 ;; Wraps calls to the C API which may return an error code. If
 ;; anything other than MDB_SUCCESS is returned, a scheme (abort)
@@ -210,6 +213,16 @@
 (define (mdb-env-copyfd env fd)
   (check-return 'mdb-env-copyfd
 		(c-mdb_env_copyfd (mdb-env-pointer env) fd)))
+
+(define c-mdb_env_copy2
+  (foreign-lambda int "mdb_env_copy2"
+    (c-pointer (struct MDB_env))
+    (const c-string)
+    unsigned-int))
+
+(define (mdb-env-copy2 env path flags)
+  (check-return 'mdb-env-copy2
+		(c-mdb_env_copy2 (mdb-env-pointer env) path flags)))
 
 (define c-mdb_env_close
   (foreign-lambda void "mdb_env_close"
