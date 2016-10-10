@@ -393,6 +393,11 @@
       (mdb-txn-commit txn))
     (mdb-env-close env)))
 
+(test-group "mdb-env-get-maxkeysize"
+  (let ((env (mdb-env-create)))
+    (test 511 (mdb-env-get-maxkeysize env))
+    (mdb-env-close env)))
+
 (test-group "mdb-del"
   (clear-testdb)
   (let ((env (mdb-env-create)))

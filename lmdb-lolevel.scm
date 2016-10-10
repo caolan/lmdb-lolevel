@@ -38,6 +38,7 @@
  mdb-env-set-maxreaders
  mdb-env-get-maxreaders
  mdb-env-set-maxdbs
+ mdb-env-get-maxkeysize
  mdb-txn-begin
  mdb-txn-commit
  mdb-txn-abort
@@ -492,6 +493,13 @@
 (define (mdb-env-set-maxdbs env dbs)
   (check-return 'mdb-env-set-maxdbs
 		(c-mdb_env_set_maxdbs (mdb-env-pointer env) dbs)))
+
+(define c-mdb_env_get_maxkeysize
+  (foreign-lambda int "mdb_env_get_maxkeysize"
+    (c-pointer (struct MDB_env))))
+
+(define (mdb-env-get-maxkeysize env)
+  (c-mdb_env_get_maxkeysize (mdb-env-pointer env)))
 
      
 ;; Transaction
