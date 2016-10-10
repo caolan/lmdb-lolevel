@@ -330,6 +330,21 @@
     (mdb-env-sync env 1)
     (mdb-env-close env)))
 
+(test-group "mdb-env-get-flags / mdb-env-set-flags"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (test-assert (not (= (bitwise-and MDB_NOSYNC (mdb-env-get-flags env))
+			 MDB_NOSYNC)))
+    (mdb-env-set-flags env MDB_NOSYNC 1)
+    (test-assert (= (bitwise-and MDB_NOSYNC (mdb-env-get-flags env))
+		    MDB_NOSYNC))
+    (mdb-env-set-flags env MDB_NOSYNC 0)
+    (test-assert (not (= (bitwise-and MDB_NOSYNC (mdb-env-get-flags env))
+			 MDB_NOTLS)))
+    (mdb-env-close env)))
+
 (test-group "mdb-del"
   (clear-testdb)
   (let ((env (mdb-env-create)))

@@ -30,6 +30,8 @@
  mdb-envinfo-numreaders
  mdb-env-sync
  mdb-env-close
+ mdb-env-set-flags
+ mdb-env-get-flags
  mdb-txn-begin
  mdb-txn-commit
  mdb-txn-abort
@@ -366,6 +368,31 @@
 (define (mdb-env-close env)
   (c-mdb_env_close (mdb-env-pointer env)))
 
+(define c-mdb_env_set_flags
+  (foreign-lambda int "mdb_env_set_flags"
+    (c-pointer (struct MDB_env))
+    unsigned-int
+    int))
+
+(define (mdb-env-set-flags env flags onoff)
+  (check-return 'mdb-env-set-flags
+		(c-mdb_env_set_flags
+		 (mdb-env-pointer env)
+		 flags
+		 onoff)))
+
+(define c-mdb_env_get_flags
+  (foreign-lambda int "mdb_env_get_flags"
+    (c-pointer (struct MDB_env))
+    (c-pointer unsigned-int)))
+
+(define (mdb-env-get-flags env)
+  (let-location ((flags unsigned-int))
+    (check-return 'mdb-env-get-flags
+		  (c-mdb_env_get_flags
+		   (mdb-env-pointer env)
+		   (location flags)))
+    flags))
 
 ;; Transaction
 
