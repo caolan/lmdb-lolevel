@@ -39,7 +39,11 @@
  mdb-env-get-maxreaders
  mdb-env-set-maxdbs
  mdb-env-get-maxkeysize
+ ;; mdb-env-set-userctx
+ ;; mdb-env-get-userctx
+ ;; mdb-env-set-assert
  mdb-txn-begin
+ mdb-txn-env
  mdb-txn-commit
  mdb-txn-abort
  mdb-dbi-open
@@ -517,6 +521,13 @@
      'mdb-txn-begin
      (c-mdb_txn_begin (mdb-env-pointer env) (and parent parent) flags (location p)))
     (make-mdb-txn p)))
+
+(define c-mdb_txn_env
+  (foreign-lambda (c-pointer (struct MDB_env)) "mdb_txn_env"
+    (c-pointer (struct MDB_txn))))
+
+(define (mdb-txn-env txn)
+  (make-mdb-env (c-mdb_txn_env (mdb-txn-pointer txn))))
 
 (define c-mdb_txn_commit
   (foreign-lambda int "mdb_txn_commit" (c-pointer (struct MDB_txn))))

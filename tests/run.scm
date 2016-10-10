@@ -398,6 +398,16 @@
     (test 511 (mdb-env-get-maxkeysize env))
     (mdb-env-close env)))
 
+(test-group "mdb-txn-env"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" MDB_NOSYNC
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let ((txn (mdb-txn-begin env #f 0)))
+      (test env (mdb-txn-env txn))
+      (mdb-txn-commit txn))
+    (mdb-env-close env)))
+
 (test-group "mdb-del"
   (clear-testdb)
   (let ((env (mdb-env-create)))
