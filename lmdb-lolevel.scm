@@ -33,6 +33,7 @@
  mdb-env-set-flags
  mdb-env-get-flags
  mdb-env-get-path
+ mdb-env-get-fd
  mdb-txn-begin
  mdb-txn-commit
  mdb-txn-abort
@@ -423,6 +424,21 @@
       (copy-memory-to-string path data len)
       path)))
 
+(define c-mdb_env_get_fd
+  (foreign-lambda int "mdb_env_get_fd"
+    (c-pointer (struct MDB_env))
+    (c-pointer int)))
+
+(define (mdb-env-get-fd env)
+  (let-location ((fd int))
+    (check-return 'mdb-env-get-fd
+		  (c-mdb_env_get_fd
+		   (mdb-env-pointer env)
+		   (location fd)))
+    fd))
+  
+    
+     
 ;; Transaction
 
 (define c-mdb_txn_begin

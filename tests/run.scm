@@ -353,6 +353,14 @@
     (test "tests/testdb" (mdb-env-get-path env))
     (mdb-env-close env)))
 
+(test-group "mdb-env-get-fd"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (test-assert (number? (mdb-env-get-fd env)))
+    (mdb-env-close env)))
+
 (test-group "mdb-del"
   (clear-testdb)
   (let ((env (mdb-env-create)))
