@@ -34,6 +34,7 @@
  mdb-env-get-flags
  mdb-env-get-path
  mdb-env-get-fd
+ mdb-env-set-mapsize
  mdb-txn-begin
  mdb-txn-commit
  mdb-txn-abort
@@ -436,7 +437,14 @@
 		   (mdb-env-pointer env)
 		   (location fd)))
     fd))
-  
+
+(define c-mdb_env_set_mapsize
+  (foreign-lambda int "mdb_env_set_mapsize"
+    (c-pointer (struct MDB_env)) size_t))
+
+(define (mdb-env-set-mapsize env size)
+  (check-return 'mdb-env-set-mapsize
+		(c-mdb_env_set_mapsize (mdb-env-pointer env) size)))
     
      
 ;; Transaction

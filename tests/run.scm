@@ -361,6 +361,16 @@
     (test-assert (number? (mdb-env-get-fd env)))
     (mdb-env-close env)))
 
+
+(test-group "mdb-env-setmapsize"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    ;; no asserts, just checking this runs without an exception for now
+    (mdb-env-set-mapsize env (* 2 10485760))
+    (mdb-env-close env)))
+
 (test-group "mdb-del"
   (clear-testdb)
   (let ((env (mdb-env-create)))
