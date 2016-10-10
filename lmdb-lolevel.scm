@@ -32,6 +32,7 @@
  mdb-env-close
  mdb-env-set-flags
  mdb-env-get-flags
+ mdb-env-get-path
  mdb-txn-begin
  mdb-txn-commit
  mdb-txn-abort
@@ -394,6 +395,34 @@
 		   (location flags)))
     flags))
 
+(define c-mdb_env_get_path
+  (foreign-lambda* int
+      (((c-pointer (struct MDB_env)) env)
+       ((c-pointer (const (c-pointer char))) data)
+       ((c-pointer size_t) len))
+    "int ret;
+     if ((ret = mdb_env_get_path(env, data))) {
+       *data = NULL;
+       *len = 0;
+       C_return(ret);
+     }
+     else {
+       *len = strlen(*data);
+       C_return(0);
+     }"))
+
+(define (mdb-env-get-path env)
+  (let-location ((data c-pointer)
+		 (len size_t))
+    (check-return 'mdb-env-get-path
+		  (c-mdb_env_get_path
+		   (mdb-env-pointer env)
+		   (location data)
+		   (location len)))
+    (let ((path (make-string len)))
+      (copy-memory-to-string path data len)
+      path)))
+
 ;; Transaction
 
 (define c-mdb_txn_begin
@@ -448,7 +477,7 @@
 
 ;; Data
 
-(define memcpy*
+(define copy-memory-to-string
   (foreign-lambda* (c-pointer void)
       ((scheme-object dest)
        ((const (c-pointer void)) src)
@@ -486,7 +515,7 @@
 			     (location val_data)
 			     (location val_size)))
     (let ((data (make-string val_size)))
-      (memcpy* data val_data val_size)
+      (copy-memory-to-string data val_data val_size)
       data)))
 
 (define c-mdb_put
