@@ -35,6 +35,8 @@
  mdb-env-get-path
  mdb-env-get-fd
  mdb-env-set-mapsize
+ mdb-env-set-maxreaders
+ mdb-env-get-maxreaders
  mdb-txn-begin
  mdb-txn-commit
  mdb-txn-abort
@@ -445,7 +447,31 @@
 (define (mdb-env-set-mapsize env size)
   (check-return 'mdb-env-set-mapsize
 		(c-mdb_env_set_mapsize (mdb-env-pointer env) size)))
-    
+
+(define c-mdb_env_set_maxreaders
+  (foreign-lambda int "mdb_env_set_maxreaders"
+    (c-pointer (struct MDB_env))
+    unsigned-int))
+
+(define (mdb-env-set-maxreaders env readers)
+  (check-return 'mdb-env-set-maxreaders
+		(c-mdb_env_set_maxreaders
+		 (mdb-env-pointer env)
+		 readers)))
+
+(define c-mdb_env_get_maxreaders
+  (foreign-lambda int "mdb_env_get_maxreaders"
+    (c-pointer (struct MDB_env))
+    (c-pointer unsigned-int)))
+
+(define (mdb-env-get-maxreaders env)
+  (let-location ((readers unsigned-int))
+    (check-return 'mdb-env-get-maxreaders
+		  (c-mdb_env_get_maxreaders
+		   (mdb-env-pointer env)
+		   (location readers)))
+    readers))
+
      
 ;; Transaction
 
