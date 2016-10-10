@@ -37,6 +37,7 @@
  mdb-env-set-mapsize
  mdb-env-set-maxreaders
  mdb-env-get-maxreaders
+ mdb-env-set-maxdbs
  mdb-txn-begin
  mdb-txn-commit
  mdb-txn-abort
@@ -141,6 +142,17 @@
 ;; Copy Flags
 (lmdb-defs copy-flags
  MDB_CP_COMPACT)
+
+;; Database Flags
+(lmdb-defs copy-flags
+ MDB_REVERSEKEY
+ MDB_DUPSORT
+ MDB_INTEGERKEY
+ MDB_DUPFIXED
+ MDB_INTEGERDUP
+ MDB_REVERSEDUP
+ MDB_CREATE)
+
 
 ;; Wraps calls to the C API which may return an error code. If
 ;; anything other than MDB_SUCCESS is returned, a scheme (abort)
@@ -471,6 +483,15 @@
 		   (mdb-env-pointer env)
 		   (location readers)))
     readers))
+
+(define c-mdb_env_set_maxdbs
+  (foreign-lambda int "mdb_env_set_maxdbs"
+    (c-pointer (struct MDB_env))
+    unsigned-int))
+
+(define (mdb-env-set-maxdbs env dbs)
+  (check-return 'mdb-env-set-maxdbs
+		(c-mdb_env_set_maxdbs (mdb-env-pointer env) dbs)))
 
      
 ;; Transaction

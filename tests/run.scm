@@ -378,6 +378,21 @@
       (test (- n 1) (mdb-env-get-maxreaders env)))
     (mdb-env-close env)))
 
+(test-group "mdb-env-set-maxdbs"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-set-maxdbs env 2)
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    ;; this would normally cause MDB_DBS_FULL error
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi1 (mdb-dbi-open txn "one" MDB_CREATE))
+	   (dbi2 (mdb-dbi-open txn "two" MDB_CREATE)))
+      (mdb-put txn dbi1 "foo" "111" 0)
+      (mdb-put txn dbi2 "bar" "222" 0)
+      (mdb-txn-commit txn))
+    (mdb-env-close env)))
+
 (test-group "mdb-del"
   (clear-testdb)
   (let ((env (mdb-env-create)))
