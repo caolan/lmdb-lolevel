@@ -838,25 +838,28 @@
 
 ;; ;; TODO: how many of these movements actually return data?
 ;; ;; http://104.237.133.194/doc/group__mdb.html#ga1206b2af8b95e7f6b0ef6b28708c9127
-;; ;; 
-;; ;; (mdb-cursor-first cursor)
+;; ;;
+;; ;; one option might be to never return a value (as this may incur unnecessary copying)
+;; ;; and require users to do mdb-cursor-get-current or my own mdb-cursor-key / mdb-cursor-data
+;; ;;
+;; ;; (mdb-cursor-first cursor) => changed key + value
 ;; ;; (mdb-cursor-first-dup cursor key)
 ;; ;; (mdb-cursor-get-both cursor key data)
 ;; ;; (mdb-cursor-get-both-range cursor key data)
 ;; ;; (mdb-cursor-get-current cursor) => (values key data)
 ;; ;; (mdb-cursor-get-multiple cursor key) => ??? (values key data-list) ???
-;; ;; (mdb-cursor-last cursor)
+;; ;; (mdb-cursor-last cursor) => changed key + value
 ;; ;; (mdb-cursor-last-dup cursor)
-;; ;; (mdb-cursor-next cursor)
+;; ;; (mdb-cursor-next cursor) => changed key + value
 ;; ;; (mdb-cursor-next-dup cursor)
 ;; ;; (mdb-cursor-next-multiple cursor)
 ;; ;; (mdb-cursor-next-nodup cursor)
-;; ;; (mdb-cursor-prev cursor)
+;; ;; (mdb-cursor-prev cursor) => changed key + value
 ;; ;; (mdb-cursor-prev-dup cursor)
 ;; ;; (mdb-cursor-prev-nodup cursor)
-;; ;; (mdb-cursor-set cursor key) => ??? (values key data) ???
-;; ;; (mdb-cursor-set-key cursor key) => (values key data)
-;; ;; (mdb-cursor-set-range cursor key) => (values key data)
+;; ;; (mdb-cursor-set cursor key) => changed value only
+;; ;; (mdb-cursor-set-key cursor key) => changed key + value
+;; ;; (mdb-cursor-set-range cursor key) => changed key + value
 
 ;; (define c-mdb_cursor_get
 ;;   (foreign-lambda* int "mdb_cursor_get"
