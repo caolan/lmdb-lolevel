@@ -296,7 +296,6 @@
       (test 2 (mdb-stat-entries stat)))
     (mdb-env-close env)))
 
-
 (test-group "mdb-env-info"
   (clear-testdb)
   (let ((env (mdb-env-create)))
@@ -408,6 +407,96 @@
       (mdb-txn-commit txn))
     (mdb-env-close env)))
 
+(test-group "mdb-txn-id"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" MDB_NOSYNC
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let ((txn (mdb-txn-begin env #f 0)))
+      (test-assert (number? (mdb-txn-id txn)))
+      (mdb-txn-commit txn))
+    (mdb-env-close env)))
+
+(test-group "mdb-txn-reset / mdb-txn-renew"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" MDB_NOSYNC
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (mdb-put txn dbi "foo" "one" 0)
+      (mdb-put txn dbi "bar" "two" 0)
+      (mdb-txn-commit txn))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (test "one" (mdb-get txn dbi "foo"))
+      (mdb-txn-reset txn)
+      (mdb-txn-renew txn)
+      (test "one" (mdb-get txn dbi "foo"))
+      )
+    (mdb-env-close env)))
+
+(test-group "mdb-stat"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0))
+	   (stat (mdb-stat txn dbi)))
+      (test-assert (number? (mdb-stat-psize stat)))
+      (test-assert (number? (mdb-stat-depth stat)))
+      (test-assert (number? (mdb-stat-branch-pages stat)))
+      (test-assert (number? (mdb-stat-leaf-pages stat)))
+      (test-assert (number? (mdb-stat-overflow-pages stat)))
+      (test-assert (number? (mdb-stat-entries stat)))
+      (test 0 (mdb-stat-entries stat))
+      (mdb-txn-commit txn))
+    (mdb-env-close env)))
+
+(test-group "mdb-dbi-flags"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f MDB_REVERSEKEY)))
+      (test MDB_REVERSEKEY
+	    (bitwise-and MDB_REVERSEKEY (mdb-dbi-flags txn dbi)))
+      (mdb-txn-commit txn))
+    (mdb-env-close env)))
+
+(test-group "mdb-drop"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-set-maxdbs env 2)
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi1 (mdb-dbi-open txn "one" MDB_CREATE))
+	   (dbi2 (mdb-dbi-open txn "two" MDB_CREATE)))
+      (mdb-put txn dbi1 "foo" "111" 0)
+      (mdb-put txn dbi2 "bar" "222" 0)
+      (mdb-txn-commit txn))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi1 (mdb-dbi-open txn "one" 0))
+	   (dbi2 (mdb-dbi-open txn "two" 0)))
+      (mdb-drop txn dbi1 0)
+      (mdb-drop txn dbi2 1)
+      (mdb-txn-commit txn))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi1 (mdb-dbi-open txn "one" 0)))
+      ;; empty database
+      (test 'not-found
+	    (condition-case (mdb-get txn dbi1 "foo")
+	      ((exn lmdb MDB_NOTFOUND) 'not-found)))
+      ;; deleted database
+      (test 'not-found
+	    (condition-case (mdb-dbi-open txn "two" 0)
+	      ((exn lmdb MDB_NOTFOUND) 'not-found)))
+      (mdb-txn-commit txn))
+    (mdb-env-close env)))
+
 (test-group "mdb-del"
   (clear-testdb)
   (let ((env (mdb-env-create)))
@@ -436,5 +525,40 @@
 	      ((exn lmdb MDB_NOTFOUND) 'not-found)))
       (mdb-txn-commit txn))
     (mdb-env-close env)))
+
+;; (test-group "cursor txn / dbi"
+;;   (clear-testdb)
+;;   (let ((env (mdb-env-create)))
+;;     (mdb-env-open env "tests/testdb" 0
+;; 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+;;     (let* ((txn (mdb-txn-begin env #f 0))
+;; 	   (dbi (mdb-dbi-open txn #f 0))
+;; 	   (cursor (mdb-cursor-open txn dbi)))
+;;       (test txn (mdb-cursor-txn cursor))
+;;       (test dbi (mdb-cursor-dbi cursor))
+;;       (mdb-cursor-close cursor)
+;;       (mdb-txn-commit txn))
+;;     (mdb-env-close env)))
+
+;; ;; (test-group "readonly txn and renew cursor"
+;; ;;   (clear-testdb)
+;; ;;   (let ((env (mdb-env-create)))
+;; ;;     (mdb-env-open env "tests/testdb" 0
+;; ;; 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+;; ;;     (let* ((txn (mdb-txn-begin env #f 0))
+;; ;; 	   (dbi (mdb-dbi-open txn #f 0)))
+;; ;;       (mdb-put txn dbi "foo" "bar" 0)
+;; ;;       (mdb-txn-commit txn))
+;; ;;     (let* ((txn (mdb-txn-begin env #f MDB_RDONLY))
+;; ;; 	   (dbi (mdb-dbi-open txn #f 0))
+;; ;; 	   (cursor (mdb-cursor-open txn dbi)))
+;; ;; 	(test "bar" (mdb-cursor-get txn dbi "foo"))
+;; ;; 	(mdb-txn-commit txn)
+;; ;; 	(mdb-txn-renew txn)
+;; ;; 	(let* ((txn2 (mdb-txn-begin env #f MDB_RDONLY))
+;; ;; 	       (dbi2 (mdb-dbi-open txn2 #f 0))
+;; ;; 	  (test "bar" (mdb-cursor-get txn dbi "foo"))
+;; ;; 	  (mdb-txn-commit txn)))
+;; ;;     (mdb-env-close env)))
 
 (test-exit)
