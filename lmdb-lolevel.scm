@@ -61,12 +61,15 @@
  mdb-get
  mdb-put
  mdb-del
- ;mdb-cursor-open
- ;mdb-cursor-close
- ;mdb-cursor-renew ;; needs test
- ;mdb-cursor-txn
- ;mdb-cursor-dbi
+ mdb-cursor-open
+ mdb-cursor-close
+ mdb-cursor-renew ;; needs test
+ mdb-cursor-txn
+ mdb-cursor-dbi
  ;mdb-cursor-get
+ mdb-cursor-first
+ mdb-cursor-key
+ mdb-cursor-data
  )
 
 (import chicken scheme foreign)
@@ -94,9 +97,9 @@
 (define-record-printer (mdb-dbi x port)
   (fprintf port "#<mdb-dbi ~S>" (mdb-dbi-handle x)))
 
-;; (define-record mdb-cursor pointer)
-;; (define-record-printer (mdb-cursor x port)
-;;   (fprintf port "#<mdb-cursor ~S>" (mdb-cursor-pointer x)))
+(define-record mdb-cursor pointer)
+(define-record-printer (mdb-cursor x port)
+  (fprintf port "#<mdb-cursor ~S>" (mdb-cursor-pointer x)))
 
 
 ;; This macro creates a variable associated with each foreign integer
@@ -783,52 +786,52 @@
 
 ;; Cursors
 
-;; (define c-mdb_cursor_open
-;;   (foreign-lambda int "mdb_cursor_open"
-;;     (c-pointer (struct MDB_txn))
-;;     unsigned-int
-;;     (c-pointer (c-pointer (struct MDB_cursor)))))
+(define c-mdb_cursor_open
+  (foreign-lambda int "mdb_cursor_open"
+    (c-pointer (struct MDB_txn))
+    unsigned-int
+    (c-pointer (c-pointer (struct MDB_cursor)))))
 
-;; (define (mdb-cursor-open txn dbi)
-;;   (let-location ((pointer c-pointer))
-;;     (check-return 'mdb-cursor-open
-;; 		  (c-mdb_cursor_open
-;; 		   (mdb-txn-pointer txn)
-;; 		   (mdb-dbi-handle dbi)
-;; 		   (location pointer)))
-;;     (make-mdb-cursor pointer)))
+(define (mdb-cursor-open txn dbi)
+  (let-location ((pointer c-pointer))
+    (check-return 'mdb-cursor-open
+		  (c-mdb_cursor_open
+		   (mdb-txn-pointer txn)
+		   (mdb-dbi-handle dbi)
+		   (location pointer)))
+    (make-mdb-cursor pointer)))
 
-;; (define c-mdb_cursor_close
-;;   (foreign-lambda void "mdb_cursor_close"
-;;     (c-pointer (struct MDB_cursor))))
+(define c-mdb_cursor_close
+  (foreign-lambda void "mdb_cursor_close"
+    (c-pointer (struct MDB_cursor))))
 
-;; (define (mdb-cursor-close cursor)
-;;   (c-mdb_cursor_close (mdb-cursor-pointer cursor)))
+(define (mdb-cursor-close cursor)
+  (c-mdb_cursor_close (mdb-cursor-pointer cursor)))
 
-;; (define c-mdb_cursor_renew
-;;   (foreign-lambda int "mdb_cursor_renew"
-;;     (c-pointer (struct MDB_txn))
-;;     (c-pointer (struct MDB_cursor))))
+(define c-mdb_cursor_renew
+  (foreign-lambda int "mdb_cursor_renew"
+    (c-pointer (struct MDB_txn))
+    (c-pointer (struct MDB_cursor))))
 
-;; (define (mdb-cursor-renew txn cursor)
-;;   (check-return 'mdb-cursor-renew
-;; 		(c-mdb_cursor_renew
-;; 		 (mdb-txn-pointer txn)
-;; 		 (mdb-cursor-pointer cursor))))
+(define (mdb-cursor-renew txn cursor)
+  (check-return 'mdb-cursor-renew
+		(c-mdb_cursor_renew
+		 (mdb-txn-pointer txn)
+		 (mdb-cursor-pointer cursor))))
 
-;; (define c-mdb_cursor_txn
-;;   (foreign-lambda (c-pointer (struct MDB_txn)) "mdb_cursor_txn"
-;;     (c-pointer (struct MDB_cursor))))
+(define c-mdb_cursor_txn
+  (foreign-lambda (c-pointer (struct MDB_txn)) "mdb_cursor_txn"
+    (c-pointer (struct MDB_cursor))))
 
-;; (define (mdb-cursor-txn cursor)
-;;   (make-mdb-txn (c-mdb_cursor_txn (mdb-cursor-pointer cursor))))
+(define (mdb-cursor-txn cursor)
+  (make-mdb-txn (c-mdb_cursor_txn (mdb-cursor-pointer cursor))))
 
-;; (define c-mdb_cursor_dbi
-;;   (foreign-lambda unsigned-int "mdb_cursor_dbi"
-;;     (c-pointer (struct MDB_cursor))))
+(define c-mdb_cursor_dbi
+  (foreign-lambda unsigned-int "mdb_cursor_dbi"
+    (c-pointer (struct MDB_cursor))))
 
-;; (define (mdb-cursor-dbi cursor)
-;;   (make-mdb-dbi (c-mdb_cursor_dbi (mdb-cursor-pointer cursor))))
+(define (mdb-cursor-dbi cursor)
+  (make-mdb-dbi (c-mdb_cursor_dbi (mdb-cursor-pointer cursor))))
 
 ;; int mdb_cursor_get 	( 	MDB_cursor *  	cursor,
 ;; 		MDB_val *  	key,
@@ -876,5 +879,71 @@
 ;;      v.mv_data = C_data_pointer(data);
 ;;      v.mv_size = C_header_size(data);
 ;;      mdb_cursor
-    
+
+(define c-mdb-cursor-first
+  (foreign-lambda* int
+      (((c-pointer (struct MDB_cursor)) cursor))
+    "MDB_val k, v;
+     C_return(mdb_cursor_get(cursor, &k, &v, MDB_FIRST));"))
+
+(define (mdb-cursor-first cursor)
+  (check-return 'mdb-cursor-first
+		(c-mdb-cursor-first (mdb-cursor-pointer cursor))))
+
+(define c-mdb-cursor-key
+  (foreign-lambda* int
+      (((c-pointer (struct MDB_cursor)) cursor)
+       ((c-pointer c-pointer) key_data)
+       ((c-pointer size_t) key_size))
+    "MDB_val k, v;
+     int ret;
+     if ((ret = mdb_cursor_get(cursor, &k, &v, MDB_GET_CURRENT))) {
+       C_return(ret);
+     }
+     else {
+         *key_data = k.mv_data;
+         *key_size = k.mv_size;
+         C_return(0);
+     }"))
+
+(define (mdb-cursor-key cursor)
+  (let-location ((key_data c-pointer)
+		 (key_size size_t))
+    (check-return 'mdb-cursor-key
+		  (c-mdb-cursor-key
+		   (mdb-cursor-pointer cursor)
+		   (location key_data)
+		   (location key_size)))
+    (let ((key (make-string key_size)))
+      (copy-memory-to-string key key_data key_size)
+      key)))
+
+(define c-mdb-cursor-data
+  (foreign-lambda* int
+      (((c-pointer (struct MDB_cursor)) cursor)
+       ((c-pointer c-pointer) val_data)
+       ((c-pointer size_t) val_size))
+    "MDB_val k, v;
+     int ret;
+     if ((ret = mdb_cursor_get(cursor, &k, &v, MDB_GET_CURRENT))) {
+       C_return(ret);
+     }
+     else {
+         *val_data = v.mv_data;
+         *val_size = v.mv_size;
+         C_return(0);
+     }"))
+
+(define (mdb-cursor-data cursor)
+  (let-location ((val_data c-pointer)
+		 (val_size size_t))
+    (check-return 'mdb-cursor-data
+		  (c-mdb-cursor-data
+		   (mdb-cursor-pointer cursor)
+		   (location val_data)
+		   (location val_size)))
+    (let ((data (make-string val_size)))
+      (copy-memory-to-string data val_data val_size)
+      data)))
+
 )
