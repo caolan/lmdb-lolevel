@@ -70,6 +70,8 @@
  mdb-cursor-first
  mdb-cursor-key
  mdb-cursor-data
+ mdb-cursor-last
+ mdb-cursor-next
  )
 
 (import chicken scheme foreign)
@@ -182,6 +184,26 @@
  MDB_REVERSEDUP
  MDB_CREATE)
 
+;; Cursor operations
+(lmdb-defs cursor-ops
+ MDB_FIRST 	
+ MDB_FIRST_DUP 	
+ MDB_GET_BOTH 	
+ MDB_GET_BOTH_RANGE 	
+ MDB_GET_CURRENT 	
+ MDB_GET_MULTIPLE 	
+ MDB_LAST 	
+ MDB_LAST_DUP 	
+ MDB_NEXT 	
+ MDB_NEXT_DUP 	
+ MDB_NEXT_MULTIPLE 	
+ MDB_NEXT_NODUP 	
+ MDB_PREV 	
+ MDB_PREV_DUP 	
+ MDB_PREV_NODUP 	
+ MDB_SET 	
+ MDB_SET_KEY 	
+ MDB_SET_RANGE)
 
 ;; Wraps calls to the C API which may return an error code. If
 ;; anything other than MDB_SUCCESS is returned, a scheme (abort)
@@ -880,16 +902,6 @@
 ;;      v.mv_size = C_header_size(data);
 ;;      mdb_cursor
 
-(define c-mdb-cursor-first
-  (foreign-lambda* int
-      (((c-pointer (struct MDB_cursor)) cursor))
-    "MDB_val k, v;
-     C_return(mdb_cursor_get(cursor, &k, &v, MDB_FIRST));"))
-
-(define (mdb-cursor-first cursor)
-  (check-return 'mdb-cursor-first
-		(c-mdb-cursor-first (mdb-cursor-pointer cursor))))
-
 (define c-mdb-cursor-key
   (foreign-lambda* int
       (((c-pointer (struct MDB_cursor)) cursor)
@@ -945,5 +957,46 @@
     (let ((data (make-string val_size)))
       (copy-memory-to-string data val_data val_size)
       data)))
+
+;; - MDB_FIRST 	
+;; MDB_FIRST_DUP 	
+;; MDB_GET_BOTH 	
+;; MDB_GET_BOTH_RANGE 	
+;; - MDB_GET_CURRENT 	
+;; MDB_GET_MULTIPLE 	
+;; - MDB_LAST 	
+;; MDB_LAST_DUP 	
+;; - MDB_NEXT 	
+;; MDB_NEXT_DUP 	
+;; MDB_NEXT_MULTIPLE 	
+;; MDB_NEXT_NODUP 	
+;; MDB_PREV 	
+;; MDB_PREV_DUP 	
+;; MDB_PREV_NODUP 	
+;; MDB_SET 	
+;; MDB_SET_KEY 	
+;; MDB_SET_RANGE
+
+(define c-mdb-cursor-get*
+  (foreign-lambda* int
+      (((c-pointer (struct MDB_cursor)) cursor)
+       (int op))
+    "MDB_val k, v;
+     C_return(mdb_cursor_get(cursor, &k, &v, op));"))
+
+(define (mdb-cursor-first cursor)
+  (check-return 'mdb-cursor-first
+		(c-mdb-cursor-get* (mdb-cursor-pointer cursor)
+				   MDB_FIRST)))
+
+(define (mdb-cursor-last cursor)
+  (check-return 'mdb-cursor-last
+		(c-mdb-cursor-get* (mdb-cursor-pointer cursor)
+				   MDB_LAST)))
+
+(define (mdb-cursor-next cursor)
+  (check-return 'mdb-cursor-next
+		(c-mdb-cursor-get* (mdb-cursor-pointer cursor)
+				   MDB_NEXT)))
 
 )
