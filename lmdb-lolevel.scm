@@ -71,6 +71,11 @@
  mdb-cursor-get
  mdb-cursor-put
  mdb-cursor-del
+ mdb-cursor-count
+ ;mdb_cmp
+ ;mdb_dcmp
+ ;mdb_reader_list
+ ;mdb_reader_check
  )
 
 (import chicken scheme foreign)
@@ -937,5 +942,18 @@
 		(c-mdb_cursor_del
 		 (mdb-cursor-pointer cursor)
 		 flags)))
+
+(define c-mdb_cursor_count
+  (foreign-lambda int "mdb_cursor_count"
+    (c-pointer (struct MDB_cursor))
+    (c-pointer size_t)))
+
+(define (mdb-cursor-count cursor)
+  (let-location ((count size_t))
+    (check-return 'mdb-cursor-count
+		  (c-mdb_cursor_count
+		   (mdb-cursor-pointer cursor)
+		   (location count)))
+    count))
 
 )

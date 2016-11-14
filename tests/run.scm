@@ -622,4 +622,22 @@
       (mdb-txn-commit txn))
     (mdb-env-close env)))
 
+(test-group "cursor count"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f MDB_DUPSORT))
+	   (cursor (mdb-cursor-open txn dbi)))
+      (mdb-put txn dbi "wibble" "foo" 0)
+      (mdb-cursor-get cursor MDB_FIRST)
+      (test 1 (mdb-cursor-count cursor))
+      (mdb-put txn dbi "wibble" "bar" 0)
+      (mdb-cursor-get cursor MDB_FIRST)
+      (test 2 (mdb-cursor-count cursor))
+      (mdb-cursor-close cursor)
+      (mdb-txn-commit txn))
+    (mdb-env-close env)))
+
 (test-exit)
