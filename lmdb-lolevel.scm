@@ -70,6 +70,7 @@
  mdb-cursor-data
  mdb-cursor-get
  mdb-cursor-put
+ mdb-cursor-del
  )
 
 (import chicken scheme foreign)
@@ -924,6 +925,17 @@
 		 (location (mdb-cursor-data-blob cursor))
 		 key
 		 data
+		 flags)))
+
+(define c-mdb_cursor_del
+  (foreign-lambda int "mdb_cursor_del"
+    (c-pointer (struct MDB_cursor))
+    unsigned-int))
+
+(define (mdb-cursor-del cursor flags)
+  (check-return 'mdb-cursor-del
+		(c-mdb_cursor_del
+		 (mdb-cursor-pointer cursor)
 		 flags)))
 
 )

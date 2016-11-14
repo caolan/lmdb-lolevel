@@ -601,4 +601,25 @@
       (mdb-txn-commit txn))
     (mdb-env-close env)))
 
+(test-group "cursor del"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0))
+	   (cursor (mdb-cursor-open txn dbi)))
+      (mdb-put txn dbi "wibble" "foo" 0)
+      (mdb-put txn dbi "wobble" "bar" 0)
+      (mdb-cursor-get cursor MDB_FIRST)
+      (test "wibble" (mdb-cursor-key cursor))
+      (test "foo" (mdb-cursor-data cursor))
+      (mdb-cursor-del cursor 0)
+      (mdb-cursor-get cursor MDB_FIRST)
+      (test "wobble" (mdb-cursor-key cursor))
+      (test "bar" (mdb-cursor-data cursor))
+      (mdb-cursor-close cursor)
+      (mdb-txn-commit txn))
+    (mdb-env-close env)))
+
 (test-exit)
