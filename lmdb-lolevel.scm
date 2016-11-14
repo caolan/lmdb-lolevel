@@ -69,6 +69,7 @@
  mdb-cursor-key
  mdb-cursor-data
  mdb-cursor-get
+ mdb-cursor-put
  )
 
 (import chicken scheme foreign)
@@ -900,10 +901,29 @@
 		 op)))
 
 (define c-mdb_cursor_put
-  (foreign-lambda int "mdb_cursor_put"
-    (c-pointer (struct MDB_cursor))
-    (c-pointer (struct MDB_val))
-    (c-pointer (struct MDB_val))
-    unsigned-int))
+  (foreign-lambda* int
+    (((c-pointer (struct MDB_cursor)) cursor)
+     ((c-pointer (struct MDB_val)) k)
+     ((c-pointer (struct MDB_val)) v)
+     (scheme-object key)
+     (scheme-object data)
+     (unsigned-int flags))
+    "C_i_check_string(key);
+     C_i_check_string(data);
+     k->mv_size = C_header_size(key);
+     k->mv_data = C_data_pointer(key);
+     v->mv_size = C_header_size(data);
+     v->mv_data = C_data_pointer(data);
+     C_return(mdb_cursor_put(cursor, k, v, flags));"))
+
+(define (mdb-cursor-put cursor key data flags)
+  (check-return 'mdb-cursor-put
+		(c-mdb_cursor_put
+		 (mdb-cursor-pointer cursor)
+		 (location (mdb-cursor-key-blob cursor))
+		 (location (mdb-cursor-data-blob cursor))
+		 key
+		 data
+		 flags)))
 
 )
