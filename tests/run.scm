@@ -640,4 +640,16 @@
       (mdb-txn-commit txn))
     (mdb-env-close env)))
 
+(test-group "cmp / dcmp"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f MDB_DUPSORT)))
+      (test-assert (negative? (mdb-cmp txn dbi "aaa" "bbb")))
+      (test-assert (positive? (mdb-cmp txn dbi "xxx" "bbb")))
+      (test-assert (negative? (mdb-dcmp txn dbi "aaa" "bbb")))
+      (test-assert (positive? (mdb-dcmp txn dbi "xxx" "bbb"))))))
+
 (test-exit)

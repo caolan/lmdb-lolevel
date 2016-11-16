@@ -72,10 +72,10 @@
  mdb-cursor-put
  mdb-cursor-del
  mdb-cursor-count
- ;mdb_cmp
- ;mdb_dcmp
- ;mdb_reader_list
- ;mdb_reader_check
+ mdb-cmp
+ mdb-dcmp
+ ;mdb-reader-list
+ ;mdb-reader-check
  )
 
 (import chicken scheme foreign)
@@ -955,5 +955,41 @@
 		   (mdb-cursor-pointer cursor)
 		   (location count)))
     count))
+
+(define c-mdb_cmp
+  (foreign-lambda* int
+   (((c-pointer (struct MDB_txn)) txn)
+    (unsigned-int dbi)
+    (scheme-object a)
+    (scheme-object b))
+   "MDB_val val_a, val_b;
+    C_i_check_string(a);
+    C_i_check_string(b);
+    val_a.mv_data = C_data_pointer(a);
+    val_a.mv_size = C_header_size(a);
+    val_b.mv_data = C_data_pointer(b);
+    val_b.mv_size = C_header_size(b);
+    C_return(mdb_cmp(txn, dbi, &val_a, &val_b));"))
+
+(define (mdb-cmp txn dbi a b)
+  (c-mdb_cmp (mdb-txn-pointer txn) (mdb-dbi-handle dbi) a b))
+
+(define c-mdb_dcmp
+  (foreign-lambda* int
+   (((c-pointer (struct MDB_txn)) txn)
+    (unsigned-int dbi)
+    (scheme-object a)
+    (scheme-object b))
+   "MDB_val val_a, val_b;
+    C_i_check_string(a);
+    C_i_check_string(b);
+    val_a.mv_data = C_data_pointer(a);
+    val_a.mv_size = C_header_size(a);
+    val_b.mv_data = C_data_pointer(b);
+    val_b.mv_size = C_header_size(b);
+    C_return(mdb_dcmp(txn, dbi, &val_a, &val_b));"))
+
+(define (mdb-dcmp txn dbi a b)
+  (c-mdb_dcmp (mdb-txn-pointer txn) (mdb-dbi-handle dbi) a b))
 
 )
