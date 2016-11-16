@@ -540,26 +540,24 @@
       (mdb-txn-commit txn))
     (mdb-env-close env)))
 
-;; (test-group "readonly txn and renew cursor"
-;;   (clear-testdb)
-;;   (let ((env (mdb-env-create)))
-;;     (mdb-env-open env "tests/testdb" 0
-;; 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
-;;     (let* ((txn (mdb-txn-begin env #f 0))
-;; 	   (dbi (mdb-dbi-open txn #f 0)))
-;;       (mdb-put txn dbi "foo" "bar" 0)
-;;       (mdb-txn-commit txn))
-;;     (let* ((txn (mdb-txn-begin env #f MDB_RDONLY))
-;; 	   (dbi (mdb-dbi-open txn #f 0))
-;; 	   (cursor (mdb-cursor-open txn dbi)))
-;; 	(test "bar" (mdb-cursor-get txn dbi "foo"))
-;; 	(mdb-txn-commit txn)
-;; 	(mdb-txn-renew txn)
-;; 	(let* ((txn2 (mdb-txn-begin env #f MDB_RDONLY))
-;; 	       (dbi2 (mdb-dbi-open txn2 #f 0))
-;; 	  (test "bar" (mdb-cursor-get txn dbi "foo"))
-;; 	  (mdb-txn-commit txn)))
-;;     (mdb-env-close env)))
+(test-group "readonly txn and renew cursor"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (mdb-put txn dbi "foo" "bar" 0)
+      (mdb-txn-commit txn))
+    (let* ((txn (mdb-txn-begin env #f MDB_RDONLY))
+	   (dbi (mdb-dbi-open txn #f 0))
+	   (cursor (mdb-cursor-open txn dbi)))
+        (test "bar" (mdb-get txn dbi "foo"))
+	(mdb-txn-reset txn)
+	(mdb-txn-renew txn)
+        (test "bar" (mdb-get txn dbi "foo"))
+	(mdb-txn-abort txn))
+    (mdb-env-close env)))
 
 (test-group "cursor get"
   (clear-testdb)
@@ -651,5 +649,32 @@
       (test-assert (positive? (mdb-cmp txn dbi "xxx" "bbb")))
       (test-assert (negative? (mdb-dcmp txn dbi "aaa" "bbb")))
       (test-assert (positive? (mdb-dcmp txn dbi "xxx" "bbb"))))))
+
+(test-group "reader list"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0))
+	   (num #f))
+      (let ((str (with-output-to-string
+		   (lambda ()
+		     (set! num (mdb-reader-list env))))))
+	(test "output written to port" "(no active readers)\n" str)
+	(test "returned integer" 0 num))
+      (mdb-txn-commit txn))
+    (mdb-env-close env)))
+
+(test-group "reader check"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f 0)))
+      (test 0 (mdb-reader-check env))
+      (mdb-txn-commit txn))
+    (mdb-env-close env)))
 
 (test-exit)

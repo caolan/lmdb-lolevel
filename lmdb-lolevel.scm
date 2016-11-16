@@ -63,7 +63,7 @@
  mdb-del
  mdb-cursor-open
  mdb-cursor-close
- mdb-cursor-renew ;; needs test
+ mdb-cursor-renew
  mdb-cursor-txn
  mdb-cursor-dbi
  mdb-cursor-key
@@ -74,8 +74,8 @@
  mdb-cursor-count
  mdb-cmp
  mdb-dcmp
- ;mdb-reader-list
- ;mdb-reader-check
+ mdb-reader-list
+ mdb-reader-check
  )
 
 (import chicken scheme foreign)
@@ -991,5 +991,35 @@
 
 (define (mdb-dcmp txn dbi a b)
   (c-mdb_dcmp (mdb-txn-pointer txn) (mdb-dbi-handle dbi) a b))
+
+(define-external (reader_list_cb ((const c-string) msg) (c-pointer port)) int
+  (display msg (pointer->object port))
+  0)
+
+(define c-mdb_reader_list
+  (foreign-safe-lambda* int
+      (((c-pointer (struct MDB_env)) env)
+       (scheme-object port))
+      "C_return(mdb_reader_list(env, &reader_list_cb, (void *)port));"))
+
+(define (mdb-reader-list env)
+  (let ((code (c-mdb_reader_list
+	       (mdb-env-pointer env)
+	       (current-output-port))))
+    (when (not (fx= code MDB_SUCCESS))
+      (abort (lmdb-condition 'mdb-reader-list code)))
+    code))
+
+(define c-mdb_reader_check
+  (foreign-lambda int "mdb_reader_check"
+    (c-pointer (struct MDB_env))
+    (c-pointer int)))
+
+(define (mdb-reader-check env)
+  (let-location ((dead int))
+    (check-return 'mdb-reader-check
+		  (c-mdb_reader_check (mdb-env-pointer env)
+				      (location dead)))
+    dead))
 
 )
