@@ -502,7 +502,7 @@
 		   (location data)
 		   (location len)))
     (let ((path (make-string len)))
-      (copy-memory-to-string path data len)
+      (copy-memory path data len)
       path)))
 
 (define c-mdb_env_get_fd
@@ -725,7 +725,7 @@
 
 ;; Data
 
-(define copy-memory-to-string
+(define copy-memory
   (foreign-lambda* (c-pointer void)
       ((scheme-object dest)
        ((const (c-pointer void)) src)
@@ -741,7 +741,7 @@
        ((c-pointer size_t) val_size))
     "MDB_val k, data;
      int ret;
-     C_i_check_string(key);
+     C_i_check_bytevector(key);
      k.mv_data = C_data_pointer(key);
      k.mv_size = C_header_size(key);
      if ((ret = mdb_get(txn, dbi, &k, &data))) {
@@ -762,8 +762,8 @@
 			     key
 			     (location val_data)
 			     (location val_size)))
-    (let ((data (make-string val_size)))
-      (copy-memory-to-string data val_data val_size)
+    (let ((data (make-blob val_size)))
+      (copy-memory data val_data val_size)
       data)))
 
 (define c-mdb_put
@@ -774,8 +774,8 @@
        (scheme-object data)
        (unsigned-int flags))
     "MDB_val k, v;
-     C_i_check_string(key);
-     C_i_check_string(data);
+     C_i_check_bytevector(key);
+     C_i_check_bytevector(data);
      k.mv_size = C_header_size(key);
      k.mv_data = C_data_pointer(key);
      v.mv_size = C_header_size(data);
@@ -816,9 +816,9 @@
 			  (mdb-txn-pointer txn)
 			  (mdb-dbi-handle dbi)
 			  (location key)
-			  (string-length key)
+			  (blob-size key)
 			  (and data (location data))
-			  (if data (string-length data) 0))))
+			  (if data (blob-size data) 0))))
 
 
 ;; Cursors
@@ -877,19 +877,19 @@
     "*size = val->mv_size;
      *data = val->mv_data;"))
   
-(define (mdb-val->string pointer)
+(define (mdb-val->blob pointer)
   (let-location ((size size_t)
 		 (data c-pointer))
     (c-mdb-val-deconstruct pointer (location size) (location data))
-    (let ((output (make-string size)))
-      (copy-memory-to-string output data size)
+    (let ((output (make-blob size)))
+      (copy-memory output data size)
       output)))
 
 (define (mdb-cursor-key cursor)
-  (mdb-val->string (location (mdb-cursor-key-blob cursor))))
+  (mdb-val->blob (location (mdb-cursor-key-blob cursor))))
 
 (define (mdb-cursor-data cursor)
-  (mdb-val->string (location (mdb-cursor-data-blob cursor))))
+  (mdb-val->blob (location (mdb-cursor-data-blob cursor))))
 
 (define c-mdb_cursor_get
   (foreign-lambda int "mdb_cursor_get"
@@ -914,8 +914,8 @@
      (scheme-object key)
      (scheme-object data)
      (unsigned-int flags))
-    "C_i_check_string(key);
-     C_i_check_string(data);
+    "C_i_check_bytevector(key);
+     C_i_check_bytevector(data);
      k->mv_size = C_header_size(key);
      k->mv_data = C_data_pointer(key);
      v->mv_size = C_header_size(data);
@@ -963,8 +963,8 @@
     (scheme-object a)
     (scheme-object b))
    "MDB_val val_a, val_b;
-    C_i_check_string(a);
-    C_i_check_string(b);
+    C_i_check_bytevector(a);
+    C_i_check_bytevector(b);
     val_a.mv_data = C_data_pointer(a);
     val_a.mv_size = C_header_size(a);
     val_b.mv_data = C_data_pointer(b);
@@ -981,8 +981,8 @@
     (scheme-object a)
     (scheme-object b))
    "MDB_val val_a, val_b;
-    C_i_check_string(a);
-    C_i_check_string(b);
+    C_i_check_bytevector(a);
+    C_i_check_bytevector(b);
     val_a.mv_data = C_data_pointer(a);
     val_a.mv_size = C_header_size(a);
     val_b.mv_data = C_data_pointer(b);
