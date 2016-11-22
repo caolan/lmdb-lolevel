@@ -54,8 +54,8 @@
  mdb-dbi-flags
  mdb-dbi-close
  mdb-drop
- ;; mdb-set-compare
- ;; mdb-set-dupsort
+ mdb-set-compare
+ mdb-set-dupsort
  ;; mdb-set-relfunc
  ;; mdb-set-relctx
  mdb-get
@@ -722,6 +722,33 @@
 		 (mdb-dbi-handle dbi)
 		 del)))
 
+(define c-mdb_set_compare
+  (foreign-lambda int "mdb_set_compare"
+    (c-pointer (struct MDB_txn))
+    unsigned-int
+    (function int ((const (c-pointer (struct MDB_val)))
+		   (const (c-pointer (struct MDB_val)))))))
+
+(define (mdb-set-compare txn dbi cmp)
+  (check-return 'mdb-set-compare
+		(c-mdb_set_compare
+		 (mdb-txn-pointer txn)
+		 (mdb-dbi-handle dbi)
+		 cmp)))
+
+(define c-mdb_set_dupsort
+  (foreign-lambda int "mdb_set_dupsort"
+    (c-pointer (struct MDB_txn))
+    unsigned-int
+    (function int ((const (c-pointer (struct MDB_val)))
+		   (const (c-pointer (struct MDB_val)))))))
+
+(define (mdb-set-dupsort txn dbi cmp)
+  (check-return 'mdb-set-dupsort
+		(c-mdb_set_dupsort
+		 (mdb-txn-pointer txn)
+		 (mdb-dbi-handle dbi)
+		 cmp)))
 
 ;; Data
 
@@ -870,6 +897,13 @@
 (define (mdb-cursor-dbi cursor)
   (make-mdb-dbi (c-mdb_cursor_dbi (mdb-cursor-pointer cursor))))
 
+(define c-mdb-val-construct
+  (foreign-lambda* void (((c-pointer (struct MDB_val)) val)
+			 (size_t size)
+			 (c-pointer data))
+    "val->mv_size = size;
+     val->mv_data = data;"))
+
 (define c-mdb-val-deconstruct
   (foreign-lambda* void (((c-pointer (struct MDB_val)) val)
 			 ((c-pointer size_t) size)
@@ -898,7 +932,15 @@
     (c-pointer (struct MDB_val))
     int))
 
-(define (mdb-cursor-get cursor op)
+(define (mdb-cursor-get cursor key data op)
+  (when key
+    (c-mdb-val-construct (location (mdb-cursor-key-blob cursor))
+			 (blob-size key)
+			 (location key)))
+  (when data
+    (c-mdb-val-construct (location (mdb-cursor-data-blob cursor))
+			 (blob-size data)
+			 (location data)))
   (check-return 'mdb-cursor-get
 		(c-mdb_cursor_get
 		 (mdb-cursor-pointer cursor)

@@ -3,3 +3,4 @@
 /lmdb-lolevel.import.scm
 /tests/testdb
 /tests/testdb2
+/tests/run

@@ -1,4 +1,12 @@
-(use test lmdb-lolevel posix)
+;; custom sort/comparison functions are only tested
+;; if the test suite is compiled with example_cmp.c
+(cond-expand
+  (compiling
+   (foreign-declare "#include \"example_cmp.h\""))
+  (else #f))
+
+(import chicken scheme)
+(use test test-generative data-generators lmdb-lolevel posix)
 
 (define (clear-testdb)
   (when (file-exists? "tests/testdb")
@@ -501,6 +509,50 @@
       (mdb-txn-commit txn))
     (mdb-env-close env)))
 
+(cond-expand
+  (compiling
+   (define example_cmp
+     (foreign-value "&example_cmp" c-pointer))
+
+   (test-group "set compare"
+     (clear-testdb)
+     (let ((env (mdb-env-create)))
+       (mdb-env-open env "tests/testdb" 0
+		     (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+       (let* ((txn (mdb-txn-begin env #f 0))
+	      (dbi (mdb-dbi-open txn #f 0))
+	      (cursor (mdb-cursor-open txn dbi)))
+	 (mdb-set-compare txn dbi example_cmp)
+	 (mdb-put txn dbi (string->blob "ab") (string->blob "one") 0)
+	 (mdb-put txn dbi (string->blob "ca") (string->blob "two") 0)
+	 (mdb-cursor-get cursor #f #f MDB_FIRST)
+	 (test "ca" (blob->string (mdb-cursor-key cursor)))
+	 (mdb-cursor-get cursor #f #f MDB_NEXT)
+	 (test "ab" (blob->string (mdb-cursor-key cursor)))
+	 (mdb-cursor-close cursor)
+	 (mdb-txn-commit txn))
+       (mdb-env-close env)))
+  
+   (test-group "set dupsort"
+     (clear-testdb)
+     (let ((env (mdb-env-create)))
+       (mdb-env-open env "tests/testdb" 0
+		     (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+       (let* ((txn (mdb-txn-begin env #f 0))
+	      (dbi (mdb-dbi-open txn #f MDB_DUPSORT))
+	      (cursor (mdb-cursor-open txn dbi)))
+	 (mdb-set-dupsort txn dbi example_cmp)
+	 (mdb-put txn dbi (string->blob "foo") (string->blob "ab") 0)
+	 (mdb-put txn dbi (string->blob "foo") (string->blob "ca") 0)
+	 (mdb-cursor-get cursor #f #f MDB_FIRST)
+	 (test "ca" (blob->string (mdb-cursor-data cursor)))
+	 (mdb-cursor-get cursor #f #f MDB_NEXT)
+	 (test "ab" (blob->string (mdb-cursor-data cursor)))
+	 (mdb-cursor-close cursor)
+	 (mdb-txn-commit txn))
+       (mdb-env-close env))))
+   (else #f))
+
 (test-group "mdb-del"
   (clear-testdb)
   (let ((env (mdb-env-create)))
@@ -573,12 +625,15 @@
 	   (cursor (mdb-cursor-open txn dbi)))
       (mdb-put txn dbi (string->blob "wibble") (string->blob "foo") 0)
       (mdb-put txn dbi (string->blob "wobble") (string->blob "bar") 0)
-      (mdb-cursor-get cursor MDB_FIRST)
+      (mdb-cursor-get cursor #f #f MDB_FIRST)
       (test (string->blob "wibble") (mdb-cursor-key cursor))
       (test (string->blob "foo") (mdb-cursor-data cursor))
-      (mdb-cursor-get cursor MDB_NEXT)
+      (mdb-cursor-get cursor #f #f MDB_NEXT)
       (test (string->blob "wobble") (mdb-cursor-key cursor))
       (test (string->blob "bar") (mdb-cursor-data cursor))
+      (mdb-cursor-get cursor (string->blob "wibble") #f MDB_SET_KEY)
+      (test (string->blob "wibble") (mdb-cursor-key cursor))
+      (test (string->blob "foo") (mdb-cursor-data cursor))
       (mdb-cursor-close cursor)
       (mdb-txn-commit txn))
     (mdb-env-close env)))
@@ -596,7 +651,7 @@
       (mdb-cursor-put cursor (string->blob "wubble") (string->blob "baz") 0)
       (test (string->blob "wubble") (mdb-cursor-key cursor))
       (test (string->blob "baz") (mdb-cursor-data cursor))
-      (mdb-cursor-get cursor MDB_FIRST)
+      (mdb-cursor-get cursor #f #f MDB_FIRST)
       (test (string->blob "wibble") (mdb-cursor-key cursor))
       (test (string->blob "foo") (mdb-cursor-data cursor))
       (mdb-cursor-close cursor)
@@ -613,11 +668,11 @@
 	   (cursor (mdb-cursor-open txn dbi)))
       (mdb-put txn dbi (string->blob "wibble") (string->blob "foo") 0)
       (mdb-put txn dbi (string->blob "wobble") (string->blob "bar") 0)
-      (mdb-cursor-get cursor MDB_FIRST)
+      (mdb-cursor-get cursor #f #f MDB_FIRST)
       (test (string->blob "wibble") (mdb-cursor-key cursor))
       (test (string->blob "foo") (mdb-cursor-data cursor))
       (mdb-cursor-del cursor 0)
-      (mdb-cursor-get cursor MDB_FIRST)
+      (mdb-cursor-get cursor #f #f MDB_FIRST)
       (test (string->blob "wobble") (mdb-cursor-key cursor))
       (test (string->blob "bar") (mdb-cursor-data cursor))
       (mdb-cursor-close cursor)
@@ -633,10 +688,10 @@
 	   (dbi (mdb-dbi-open txn #f MDB_DUPSORT))
 	   (cursor (mdb-cursor-open txn dbi)))
       (mdb-put txn dbi (string->blob "wibble") (string->blob "foo") 0)
-      (mdb-cursor-get cursor MDB_FIRST)
+      (mdb-cursor-get cursor #f #f MDB_FIRST)
       (test 1 (mdb-cursor-count cursor))
       (mdb-put txn dbi (string->blob "wibble") (string->blob "bar") 0)
-      (mdb-cursor-get cursor MDB_FIRST)
+      (mdb-cursor-get cursor #f #f MDB_FIRST)
       (test 2 (mdb-cursor-count cursor))
       (mdb-cursor-close cursor)
       (mdb-txn-commit txn))
@@ -688,5 +743,26 @@
       (test 0 (mdb-reader-check env))
       (mdb-txn-commit txn))
     (mdb-env-close env)))
+
+(test-group "throw some random data at it"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" MDB_NOSYNC
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let ((max-key-size (mdb-env-get-maxkeysize env)))
+      (parameterize
+	  ((current-test-generative-iterations 100))
+	(test-generative ((k (with-size (range 1 max-key-size)
+					(gen-string-of (gen-char #\null #\ÿ))))
+			  (v (with-size (range 1 5000)
+					(gen-string-of (gen-char #\null #\ÿ)))))
+	(let* ((txn (mdb-txn-begin env #f 0))
+	       (dbi (mdb-dbi-open txn #f 0)))
+	  (mdb-put txn dbi (string->blob k) (string->blob v) 0)
+	  (test "returned data matches put"
+		(string->blob v)
+		(mdb-get txn dbi (string->blob k)))
+	  (mdb-txn-commit txn))))
+    (mdb-env-close env))))
 
 (test-exit)
