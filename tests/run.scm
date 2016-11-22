@@ -1,11 +1,3 @@
-;; custom sort/comparison functions are only tested
-;; if the test suite is compiled with example_cmp.c
-(cond-expand
-  (compiling
-   (foreign-declare "#include \"example_cmp.h\""))
-  (else #f))
-
-(import chicken scheme)
 (use test test-generative data-generators lmdb-lolevel posix)
 
 (define (clear-testdb)
@@ -509,8 +501,24 @@
       (mdb-txn-commit txn))
     (mdb-env-close env)))
 
+;; custom sort/comparison functions are only tested
+;; if the test suite is compiled with example_cmp.c
 (cond-expand
   (compiling
+   (foreign-declare "#include <lmdb.h>")
+   (foreign-declare
+    "int example_cmp(const MDB_val *a, const MDB_val *b) {
+       char ca = ((char *)a->mv_data)[1];
+       char cb = ((char *)b->mv_data)[1];
+       if (ca > cb) {
+         return 1;
+       }
+       else if (ca < cb) {
+         return -1;
+       }
+       return 0;
+     }")
+
    (define example_cmp
      (foreign-value "&example_cmp" c-pointer))
 
