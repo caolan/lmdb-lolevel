@@ -199,6 +199,16 @@
  MDB_REVERSEDUP
  MDB_CREATE)
 
+;; Put flags
+(lmdb-defs put-flags
+ MDB_CURRENT
+ MDB_NODUPDATA
+ MDB_NOOVERWRITE
+ MDB_RESERVE
+ MDB_APPEND
+ MDB_APPENDDUP
+ MDB_MULTIPLE)
+
 ;; Cursor operations
 (lmdb-defs cursor-ops
  MDB_FIRST 	
