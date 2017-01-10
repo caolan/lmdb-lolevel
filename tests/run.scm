@@ -411,15 +411,22 @@
       (mdb-txn-commit txn))
     (mdb-env-close env)))
 
-(test-group "mdb-txn-id"
-  (clear-testdb)
-  (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" MDB_NOSYNC
-		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
-    (let ((txn (mdb-txn-begin env #f 0)))
-      (test-assert (number? (mdb-txn-id txn)))
-      (mdb-txn-commit txn))
-    (mdb-env-close env)))
+;; this feature only available in LMDB 0.9.15+
+;; debian jessie (current stable) only has LMDB 0.9.14
+(define mdb-txn-id-available
+  (every (cut apply (cut >= <> <>) <>)
+         (zip (vector->list (mdb-version)) '(0 9 15))))
+
+(when mdb-txn-id-available
+  (test-group "mdb-txn-id"
+    (clear-testdb)
+    (let ((env (mdb-env-create)))
+      (mdb-env-open env "tests/testdb" MDB_NOSYNC
+  		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+      (let ((txn (mdb-txn-begin env #f 0)))
+        (test-assert (number? (mdb-txn-id txn)))
+        (mdb-txn-commit txn))
+      (mdb-env-close env))))
 
 (test-group "mdb-txn-reset / mdb-txn-renew"
   (clear-testdb)

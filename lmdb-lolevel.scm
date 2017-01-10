@@ -79,7 +79,7 @@
  )
 
 (import chicken scheme foreign)
-(use srfi-69 lolevel data-structures)
+(use srfi-1 srfi-69 lolevel data-structures)
 
 (foreign-declare "#include <lmdb.h>")
 (foreign-declare "#include <errno.h>")
@@ -600,12 +600,20 @@
 (define (mdb-txn-env txn)
   (make-mdb-env (c-mdb_txn_env (mdb-txn-pointer txn))))
 
+;; this feature only available in LMDB 0.9.15+
+;; debian jessie (current stable) only has LMDB 0.9.14
+(define mdb-txn-id-available
+  (every (cut apply (cut >= <> <>) <>)
+         (zip (vector->list (mdb-version)) '(0 9 15))))
+
 (define c-mdb_txn_id
   (foreign-lambda size_t "mdb_txn_id"
     (c-pointer (struct MDB_txn))))
 
 (define (mdb-txn-id txn)
-  (c-mdb_txn_id (mdb-txn-pointer txn)))
+  (if mdb-txn-id-available
+    (c-mdb_txn_id (mdb-txn-pointer txn))
+    (abort "mdb-txn-id only available with LMDB 0.9.15+")))
 
 (define c-mdb_txn_commit
   (foreign-lambda int "mdb_txn_commit" (c-pointer (struct MDB_txn))))
