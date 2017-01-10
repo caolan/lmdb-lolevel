@@ -2,4 +2,4 @@
  (author "Caolan McMahon")
  (category db)
  (license "BSD")
- (test-depends test))
+ (test-depends test test-generative data-generators))
