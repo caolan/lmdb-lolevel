@@ -773,4 +773,26 @@
 	  (mdb-txn-commit txn))))
     (mdb-env-close env))))
 
+(test-group "iterate over dupsort data"
+  (clear-testdb)
+  (let ((env (mdb-env-create)))
+    (mdb-env-open env "tests/testdb" 0
+		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+    (let* ((txn (mdb-txn-begin env #f 0))
+	   (dbi (mdb-dbi-open txn #f MDB_DUPSORT))
+	   (cursor (mdb-cursor-open txn dbi)))
+      (mdb-put txn dbi (string->blob "foo") (string->blob "ab") 0)
+      (mdb-put txn dbi (string->blob "foo") (string->blob "ca") 0)
+      (mdb-cursor-get cursor #f #f MDB_FIRST)
+      (test "ab" (blob->string (mdb-cursor-data cursor)))
+      (mdb-cursor-get cursor #f #f MDB_NEXT_DUP)
+      (test "ca" (blob->string (mdb-cursor-data cursor)))
+      ;; calling MDB_NEXT_DUP at last duplicate data entry results in not found
+      (test 'not-found
+	    (condition-case (mdb-cursor-get cursor #f #f MDB_NEXT_DUP)
+	      ((exn lmdb MDB_NOTFOUND) 'not-found)))
+      (mdb-cursor-close cursor)
+      (mdb-txn-commit txn))
+    (mdb-env-close env)))
+
 (test-exit)
