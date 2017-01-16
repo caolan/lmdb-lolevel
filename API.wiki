@@ -1,0 +1,1092 @@
+== lmdb-lolevel
+
+[[toc:]]
+
+=== Description
+
+Low-level bindings to [[https://symas.com/products/lightning-memory-mapped-database/|LMDB]] (the Lightning Memory-mapped Database used in OpenLDAP), closely following the C API. For more detailed information see the [[http://lmdb.tech/doc/group__mdb.html|C library documentation]]. A higher-level library exists, currently unrelated to this one, in the [[http://wiki.call-cc.org/eggref/4/lmdb|lmdb egg]].
+
+=== API
+
+==== Procedures
+
+===== Utils
+
+<procedure>(mdb-strerror code)</procedure>
+Return a string describing a given error code.
+
+<procedure>(mdb-version)</procedure>
+Return the LMDB library version information. This procedure returns a vector containing the major, minor and patch version numbers, e.g. #(0 9 18). To obtain version information in a string use mdb-version-string instead.
+
+<procedure>(mdb-version-string)</procedure>
+A string representation of the current LMDB library version. To obtain the version number directly see mdb-version.
+
+===== Environment
+
+<procedure>(mdb-env-create)</procedure>
+Creates and returns a new LMDB environment handle.
+
+<procedure>(mdb-env-open env path flags mode)</procedure>
+Open an environment handle.
+
+If this function fails, (mdb-env-close) must be called to discard the MDB_env handle.
+
+; env : An environment handle returned by (mdb-env-create)
+; path : The directory in which the database files reside. This directory must already exist and be writable.
+; flags : Special options for this environment. This parameter must be set to 0 or by bitwise OR'ing (using the bitwise-ior procedure) together one or more of the values described in the Constants section with heading 'Environment Flags'. Flags set by (mdb-env-set-flags) are also used.
+; mode : The UNIX permissions to set on created files and semaphores. This parameter is ignored on Windows.
+
+Some possible error conditions:
+
+; (exn lmdb MDB_VERSION_MISMATCH) : the version of the LMDB library doesn't match the version that created the database environment.
+; (exn lmdb MDB_INVALID) : the environment file headers are corrupted.
+; (exn lmdb ENOENT) : the directory specified by the path parameter doesn't exist.
+; (exn lmdb EACCES) : the user didn't have permission to access the environment files.
+; (exn lmdb EAGAIN) : the environment was locked by another process.
+
+<procedure>(mdb-env-copy env path)</procedure>
+Copy an LMDB environment to the specified path.
+
+This function may be used to make a backup of an existing environment.
+No lockfile is created, since it gets recreated at need.
+
+'''Note:''' This call can trigger significant file size growth if run
+in parallel with write transactions, because it employs a read-only
+transaction. See long-lived transactions under Caveats in the C API documentation.
+
+; env : An environment handle returned by (mdb-env-create). It must have already been opened successfully.
+; path : The directory in which the copy will reside. This directory must already exist and be writable but must otherwise be empty.
+
+<procedure>(mdb-env-copyfd env fd)</procedure>
+Copy an LMDB environment to the specified file descriptor.
+
+This function may be used to make a backup of an existing environment.
+No lockfile is created, since it gets recreated at need.
+
+'''Note:''' This call can trigger significant file size growth if run
+in parallel with write transactions, because it employs a read-only
+transaction. See long-lived transactions under Caveats in the C API documentation.
+
+; env : An environment handle returned by (mdb-env-create). It must have already been opened successfully.
+; path : The filedescriptor to write the copy to. It must have already been opened for Write access.
+
+<procedure>(mdb-env-copy2 env path flags)</procedure>
+Copy an LMDB environment to the specified path, with options.
+
+This function may be used to make a backup of an existing environment.
+No lockfile is created, since it gets recreated at need.
+
+'''Note:''' This call can trigger significant file size growth if run
+in parallel with write transactions, because it employs a read-only
+transaction. See long-lived transactions under Caveats in the C API documentation.
+
+; env : An environment handle returned by (mdb-env-create). It must have already been opened successfully.
+; path : The directory in which the copy will reside. This directory must already exist and be writable but must otherwise be empty.
+; flags : Special options for this operation. This parameter must be set to 0 or by bitwise OR'ing together (using the bitwise-ior procedure) one or more of the values described in the Constants section 'Copy Flags'
+
+<procedure>(mdb-env-copyfd2 env fd flags)</procedure>
+Copy an LMDB environment to the specified file descriptor, with options.
+
+This function may be used to make a backup of an existing environment.
+No lockfile is created, since it gets recreated at need. See
+(mdb-env-copy2) for further details.
+
+'''Note:''' This call can trigger significant file size growth if run
+in parallel with write transactions, because it employs a read-only
+transaction. See long-lived transactions under Caveats in the C API documentation.
+
+; env : An environment handle returned by (mdb-env-create). It must have already been opened successfully.
+; fd : The filedescriptor to write the copy to. It must have already been opened for Write access.
+; flags : Special options for this operation. See (mdb-env-copy2) for options.
+
+<procedure>(mdb-env-stat env)</procedure>
+Return statistics about the LMDB environment in the form of an mdb-stat record.
+
+; env : An environment handle returned by (mdb-env-create)
+
+<procedure>(mdb-stat-psize stats)</procedure>
+Given an mdb-stat record, returns the psize field.
+
+<procedure>(mdb-stat-depth stats)</procedure>
+Given an mdb-stat record, returns the depth field.
+
+<procedure>(mdb-stat-branch-pages stats)</procedure>
+Given an mdb-stat record, returns the branch-pages field.
+
+<procedure>(mdb-stat-leaf-pages stats)</procedure>
+Given an mdb-stat record, returns the leaf-pages field.
+
+<procedure>(mdb-stat-overflow-pages stats)</procedure>
+Given an mdb-stat record, returns the overflow-pages field.
+
+<procedure>(mdb-stat-entries stats)</procedure>
+Given an mdb-stat record, returns the entries field.
+
+<procedure>(mdb-env-info env)</procedure>
+Return information about the LMDB environment in the form of an mdb-envinfo record.
+
+<procedure>(mdb-envinfo-mapaddr info)</procedure>
+Given an mdb-envinfo record, returns the mapaddr field.
+
+<procedure>(mdb-envinfo-mapsize info)</procedure>
+Given an mdb-envinfo record, returns the mapsize field.
+
+<procedure>(mdb-envinfo-last-pgno info)</procedure>
+Given an mdb-envinfo record, returns the last-pgno field.
+
+<procedure>(mdb-envinfo-last-txnid info)</procedure>
+Given an mdb-envinfo record, returns the last-txnid field.
+
+<procedure>(mdb-envinfo-maxreaders info)</procedure>
+Given an mdb-envinfo record, returns the maxreaders field.
+
+<procedure>(mdb-envinfo-numreaders info)</procedure>
+Given an mdb-envinfo record, returns the numreaders field.
+
+<procedure>(mdb-env-sync env force)</procedure>
+Flush the data buffers to disk.
+
+Data is always written to disk when (mdb-txn-commit) is called, but
+the operating system may keep it buffered. LMDB always flushes the OS
+buffers upon commit as well, unless the environment was opened with
+MDB_NOSYNC or in part MDB_NOMETASYNC. This call is not valid if the
+environment was opened with MDB_RDONLY.
+
+; env : An environment handle returned by (mdb-env-create)
+; force : If non-zero, force a synchronous flush. Otherwise if the environment has the MDB_NOSYNC flag set the flushes will be omitted, and with MDB_MAPASYNC they will be asynchronous.
+
+Some possible error conditions:
+
+; (exn lmdb EACCES) : the environment is read-only.
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+; (exn lmdb EIO) : an error occurred during synchronization.
+
+<procedure>(mdb-env-close env)</procedure>
+Close the environment and release the memory map.
+
+Only a single thread may call this function. All transactions,
+databases, and cursors must already be closed before calling this
+function. Attempts to use any such handles after calling this function
+will cause a SIGSEGV. The environment handle will be freed and must
+not be used again after this call.
+
+; env : An environment handle returned by (mdb-env-create)
+
+<procedure>(mdb-env-set-flags env flags onoff)</procedure>
+Set environment flags.
+
+This may be used to set some flags in addition to those from
+(mdb-env-open), or to unset these flags. If several threads change the
+flags at the same time, the result is undefined.
+
+; env : An environment handle returned by (mdb-env-create)
+; flags : The flags to change, bitwise OR'ed together
+; onoff : A non-zero value sets the flags, zero clears them.
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-env-get-flags env flags)</procedure>
+Get environment flags.
+
+; env : An environment handle returned by (mdb-env-create)
+; flags : The address of an integer to store the flags
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-env-get-path env)</procedure>
+Return the path that was used in (mdb-env-open).
+
+; env : An environment handle returned by (mdb-env-create)
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-env-get-fd env)</procedure>
+Return the filedescriptor for the given environment.
+
+; env : An environment handle returned by (mdb-env-create)
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-env-set-mapsize env size)</procedure>
+Set the size of the memory map to use for this environment.
+
+The size should be a multiple of the OS page size. The default is
+10485760 bytes. The size of the memory map is also the maximum size of
+the database. The value should be chosen as large as possible, to
+accommodate future growth of the database. This function should be
+called after (mdb-env-create) and before (mdb-env-open). It may be
+called at later times if no transactions are active in this process.
+Note that the library does not check for this condition, the caller
+must ensure it explicitly.
+
+The new size takes effect immediately for the current process but will
+not be persisted to any others until a write transaction has been
+committed by the current process. Also, only mapsize increases are
+persisted into the environment.
+
+If the mapsize is increased by another process, and data has grown
+beyond the range of the current mapsize, (mdb-txn-begin) will return
+MDB_MAP_RESIZED. This function may be called with a size of zero to
+adopt the new size.
+
+Any attempt to set a size smaller than the space already consumed by
+the environment will be silently changed to the current size of the
+used space.
+
+; env : An environment handle returned by (mdb-env-create)
+; size : The size in bytes
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified, or the environment has an active write transaction. 
+
+<procedure>(mdb-env-set-maxreaders env readers)</procedure>
+Set the maximum number of threads/reader slots for the environment.
+
+This defines the number of slots in the lock table that is used to
+track readers in the the environment. The default is 126. Starting a
+read-only transaction normally ties a lock table slot to the current
+thread until the environment closes or the thread exits. If MDB_NOTLS
+is in use, (mdb-txn-begin) instead ties the slot to the MDB_txn object
+until it or the MDB_env object is destroyed. This function may only be
+called after (mdb-env-create) and before (mdb-env-open).
+
+; env : An environment handle returned by (mdb-env-create)
+; readers : The maximum number of reader lock table slots
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified, or the environment is already open.
+
+<procedure>(mdb-env-get-maxreaders env)</procedure>
+Get the maximum number of threads/reader slots for the environment.
+
+; env : An environment handle returned by (mdb-env-create)
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-env-set-maxdbs env dbs)</procedure>
+Set the maximum number of named databases for the environment.
+
+This function is only needed if multiple databases will be used in the
+environment. Simpler applications that use the environment as a single
+unnamed database can ignore this option. This function may only be
+called after (mdb-env-create) and before (mdb-env-open).
+
+Currently a moderate number of slots are cheap but a huge number gets
+expensive: 7-120 words per transaction, and every (mdb-dbi-open) does
+a linear search of the opened slots.
+
+; env : An environment handle returned by (mdb-env-create)
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified, or the environment is already open.
+
+<procedure>(mdb-env-get-maxkeysize env)</procedure>
+Get the maximum size of keys and MDB_DUPSORT data we can write.
+
+Depends on the compile-time constant MDB_MAXKEYSIZE. Default 511. See MDB_val.
+
+; env : An environment handle returned by (mdb-env-create)
+
+===== Transactions
+
+<procedure>(mdb-txn-begin env parent flags)</procedure>
+Create a transaction for use with the environment.
+
+The transaction handle may be discarded using (mdb-txn-abort) or
+(mdb-txn-commit).
+
+'''Note:''' A transaction and its cursors must only be used by a
+single thread, and a thread may only have a single transaction at a
+time. If MDB_NOTLS is in use, this does not apply to read-only
+transactions. Cursors may not span transactions.
+
+; env : An environment handle returned by (mdb-env-create)
+; parent : If this parameter is non-NULL, the new transaction will be a nested transaction, with the transaction indicated by parent as its parent. Transactions may be nested to any level. A parent transaction and its cursors may not issue any other operations than mdb_txn_commit and mdb_txn_abort while it has active child transactions.
+; flags : Special options for this transaction. This parameter must be set to 0 or by bitwise OR'ing together one or more of the values described here. '''MDB_RDONLY''' - This transaction will not perform any write operations.
+
+Some possible error conditions:
+
+; (exn lmdb MDB_PANIC) : a fatal error occurred earlier and the environment must be shut down.
+; (exn lmdb MDB_MAP_RESIZED) : another process wrote data beyond this MDB_env's mapsize and this environment's map must be resized as well. See (mdb-env-set-mapsize).
+; (exn lmdb MDB_READERS_FULL) : a read-only transaction was requested and the reader lock table is full. See mdb_(env-set-maxreaders).
+; (exn lmdb ENOMEM) : out of memory.
+
+<procedure>(mdb-txn-env txn)</procedure>
+Returns the transaction's MDB_env.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+
+<procedure>(mdb-txn-id txn)</procedure>
+Return the transaction's ID.
+
+This returns the identifier associated with this transaction. For a
+read-only transaction, this corresponds to the snapshot being read;
+concurrent readers will frequently have the same transaction ID.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+
+<procedure>(mdb-txn-commit txn)</procedure>
+Commit all the operations of a transaction into the database.
+
+The transaction handle is freed. It and its cursors must not be used
+again after this call, except with (mdb-cursor-renew).
+
+'''Note:''' Earlier documentation incorrectly said all cursors would
+be freed. Only write-transactions free cursors.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+; (exn lmdb ENOSPC) : no more disk space.
+; (exn lmdb EIO) : a low-level I/O error occurred while writing.
+; (exn lmdb ENOMEM) : out of memory.
+
+<procedure>(mdb-txn-abort txn)</procedure>
+Abandon all the operations of the transaction instead of saving them.
+
+The transaction handle is freed. It and its cursors must not be used
+again after this call, except with (mdb-cursor-renew).
+
+'''Note:''' Earlier documentation incorrectly said all cursors would
+be freed. Only write-transactions free cursors.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+
+<procedure>(mdb-txn-reset txn)</procedure>
+Reset a read-only transaction.
+
+Abort the transaction like (mdb-txn-abort), but keep the transaction
+handle. (mdb-txn-renew) may reuse the handle. This saves allocation
+overhead if the process will start a new read-only transaction soon,
+and also locking overhead if MDB_NOTLS is in use. The reader table
+lock is released, but the table slot stays tied to its thread or
+MDB_txn. Use (mdb-txn-abort) to discard a reset handle, and to free
+its lock table slot if MDB_NOTLS is in use. Cursors opened within the
+transaction must not be used again after this call, except with
+(mdb-cursor-renew). Reader locks generally don't interfere with
+writers, but they keep old versions of database pages allocated. Thus
+they prevent the old pages from being reused when writers commit new
+data, and so under heavy load the database size may grow much more
+rapidly than otherwise.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+
+<procedure>(mdb-txn-renew txn)</procedure>
+Renew a read-only transaction.
+
+This acquires a new reader lock for a transaction handle that had been
+released by (mdb-txn-reset). It must be called before a reset
+transaction may be used again.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+
+Some possible error conditions:
+
+; (exn lmdb MDB_PANIC) : a fatal error occurred earlier and the environment must be shut down.
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+===== Databases
+
+<procedure>(mdb-dbi-open txn name flags)</procedure>
+Open a database in the environment.
+
+A database handle denotes the name and parameters of a database,
+independently of whether such a database exists. The database handle
+may be discarded by calling (mdb-dbi-close). The old database handle
+is returned if the database was already open. The handle may only be
+closed once.
+
+The database handle will be private to the current transaction until
+the transaction is successfully committed. If the transaction is
+aborted the handle will be closed automatically. After a successful
+commit the handle will reside in the shared environment, and may be
+used by other transactions.
+
+This function must not be called from multiple concurrent transactions
+in the same process. A transaction that uses this function must finish
+(either commit or abort) before any other transaction in the process
+may use this function.
+
+To use named databases (with name != NULL), (mdb-env-set-maxdbs) must
+be called before opening the environment. Database names are keys in
+the unnamed database, and may be read but not written.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; name : The name of the database to open. If only a single database is needed in the environment, this value may be #f
+; flags : Special options for this database. This parameter must be set to 0 or by bitwise OR'ing together (using the bitwise-ior procedure) one or more of the values described in the 'Database Flags' section in Contants.
+
+Some possible error conditions:
+
+; (exn lmdb MDB_NOTFOUND) : the specified database doesn't exist in the environment and MDB_CREATE was not specified.
+; (exn lmdb MDB_DBS_FULL) : too many databases have been opened. See (mdb-env-set-maxdbs).
+
+<procedure>(mdb-stat txn dbi)</procedure>
+Retrieve statistics for a database. Returns an mdb-stat record.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; dbi : A database handle returned by (mdb-dbi-open)
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-dbi-flags txn dbi)</procedure>
+Retrieve the DB flags for a database handle.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; dbi : A database handle returned by (mdb-dbi-open)
+
+<procedure>(mdb-dbi-close env dbi)</procedure>
+Close a database handle. Normally unnecessary. Use with care:
+
+This call is not mutex protected. Handles should only be closed by a
+single thread, and only if no other threads are going to reference the
+database handle or one of its cursors any further. Do not close a
+handle if an existing transaction has modified its database. Doing so
+can cause misbehavior from database corruption to errors like
+MDB_BAD_VALSIZE (since the DB name is gone).
+
+Closing a database handle is not necessary, but lets (mdb-dbi-open)
+reuse the handle value. Usually it's better to set a bigger
+(mdb-env-set-maxdbs), unless that value would be large.
+
+; env : An environment handle returned by (mdb-env-create)
+; dbi : A database handle returned by (mdb-dbi-open)
+    
+<procedure>(mdb-drop txn dbi del)</procedure>
+Empty or delete+close a database.
+
+See (mdb-dbi-close) for restrictions about closing the DB handle.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; dbi : A database handle returned by (mdb-dbi-open)
+; del : 0 to empty the DB, 1 to delete it from the environment and close the DB handle.
+
+<procedure>(mdb-set-compare txn dbi cmp)</procedure>
+Set a custom key comparison function for a database.
+
+The comparison function is called whenever it is necessary to compare
+a key specified by the application with a key currently stored in the
+database. If no comparison function is specified, and no special key
+flags were specified with (mdb-dbi-open), the keys are compared
+lexically, with shorter keys collating before longer keys.
+
+'''NOTE:''' This is not expected to be a scheme function, but a
+pointer to a C function. See the examples for a way to define a C
+comparison function.
+
+'''Warning:''' This function must be called before any data access
+functions are used, otherwise data corruption may occur. The same
+comparison function must be used by every program accessing the
+database, every time the database is used.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; dbi : A database handle returned by (mdb-dbi-open)
+; cmp : A MDB_cmp_func function
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-set-dupsort txn dbi cmp)</procedure>
+Set a custom data comparison function for a MDB_DUPSORT database.
+
+This comparison function is called whenever it is necessary to compare
+a data item specified by the application with a data item currently
+stored in the database. This function only takes effect if the
+database was opened with the MDB_DUPSORT flag. If no comparison
+function is specified, and no special key flags were specified with
+(mdb-dbi-open), the data items are compared lexically, with shorter
+items collating before longer items.
+
+'''NOTE:''' This is not expected to be a scheme function, but a
+pointer to a C function. See the examples for a way to define a C
+comparison function.
+
+'''Warning:''' This function must be called before any data access
+functions are used, otherwise data corruption may occur. The same
+comparison function must be used by every program accessing the
+database, every time the database is used.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; dbi : A database handle returned by (mdb-dbi-open)
+; cmp : A MDB_cmp_func function
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-cmp txn dbi a b)</procedure>
+Compare two data items according to a particular database.
+
+This returns a comparison as if the two data items were keys in the
+specified database.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; dbi : A database handle returned by (mdb-dbi-open)
+; a : The first item to compare (blob)
+; b : The second item to compare (blob)
+
+'''Returns:''' < 0 if a < b, 0 if a == b, > 0 if a > b 
+
+<procedure>(mdb-dcmp txn dbi a b)</procedure>
+Compare two data items according to a particular database.
+
+This returns a comparison as if the two items were data items of the
+specified database. The database must have the MDB_DUPSORT flag.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; dbi : A database handle returned by (mdb-dbi-open)
+; a : The first item to compare (blob)
+; b : The second item to compare (blob)
+
+'''Returns:''' < 0 if a < b, 0 if a == b, > 0 if a > b 
+
+<procedure>(mdb-reader-list env)</procedure>
+Dump the entries in the reader lock table to (current-output-port).
+
+; env : An environment handle returned by (mdb-env-create)
+
+<procedure>(mdb-reader-check env)</procedure>
+Check for stale entries in the reader lock table. Returns number of
+stale slots that were cleared.
+
+; env : An environment handle returned by (mdb-env-create)
+
+===== Get / Put / Delete
+
+<procedure>(mdb-get txn dbi key)</procedure>
+Get items from a database.
+
+This function retrieves key/data pairs from the database. The address
+and length of the data associated with the specified key are returned
+in the structure to which data refers. If the database supports
+duplicate keys (MDB_DUPSORT) then the first data item for the key will
+be returned. Retrieval of other items requires the use of
+(mdb-cursor-get). This function will raise an (exn lmdb MDB_NOTFOUND)
+condition if the specified key is not in the database.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; dbi : A database handle returned by (mdb-dbi-open)
+; key : The key to search for in the database (blob)
+
+Some possible error conditions:
+
+; (exn lmdb MDB_NOTFOUND) : the key was not in the database.
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-put txn dbi key data flags)</procedure>
+Store items into a database.
+
+This function stores key/data pairs in the database. The default
+behavior is to enter the new key/data pair, replacing any previously
+existing key if duplicates are disallowed, or adding a duplicate data
+item if duplicates are allowed (MDB_DUPSORT).
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; dbi : A database handle returned by (mdb-dbi-open)
+; key : The key to store in the database (blob)
+; data : The data to store (blob)
+; flags : Special options for this operation. This parameter must be set to 0 or by bitwise OR'ing together (using the bitwise-ior procedure) one or more of the values described in the 'Put Flags' section in Contants.
+
+Some possible error conditions:
+
+; (exn lmdb MDB_MAP_FULL) : the database is full, see (mdb-env-set-mapsize).
+; (exn lmdb MDB_TXN_FULL) : the transaction has too many dirty pages.
+; (exn lmdb EACCES) : an attempt was made to write in a read-only transaction.
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-del txn dbi key #!optional data)</procedure>
+Delete items from a database.
+
+This function removes key/data pairs from the database. If the
+database does not support sorted duplicate data items (MDB_DUPSORT)
+the data parameter is ignored. If the database supports sorted
+duplicates and the data parameter is #f, all of the duplicate data
+items for the key will be deleted. Otherwise, if the data parameter is
+non-NULL only the matching data item will be deleted. This function
+will raise an (exn lmdb MDB_NOTFOUND) condition if the specified
+key/data pair is not in the database.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; dbi : A database handle returned by (mdb-dbi-open)
+; key : The key to delete from the database (blob)
+; data : The data to delete (blob)
+
+Some possible error conditions:
+
+; (exn lmdb EACCES) : an attempt was made to write in a read-only transaction.
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+===== Cursors
+
+<procedure>(mdb-cursor-open txn dbi)</procedure>
+Create a cursor handle.
+
+A cursor is associated with a specific transaction and database. A
+cursor cannot be used when its database handle is closed. Nor when its
+transaction has ended, except with (mdb-cursor-renew). It can be
+discarded with (mdb-cursor-close). A cursor in a write-transaction can
+be closed before its transaction ends, and will otherwise be closed
+when its transaction ends. A cursor in a read-only transaction must be
+closed explicitly, before or after its transaction ends. It can be
+reused with (mdb-cursor-renew) before finally closing it.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; dbi : A database handle returned by (mdb-dbi-open)
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified
+
+<procedure>(mdb-cursor-close cursor)</procedure>
+Close a cursor handle.
+
+The cursor handle will be freed and must not be used again after this
+call. Its transaction must still be live if it is a write-transaction.
+
+; cursor : A cursor handle returned by (mdb-cursor-open)
+
+<procedure>(mdb-cursor-renew txn cursor)</procedure>
+Renew a cursor handle.
+
+A cursor is associated with a specific transaction and database.
+Cursors that are only used in read-only transactions may be re-used,
+to avoid unnecessary malloc/free overhead. The cursor may be
+associated with a new read-only transaction, and referencing the same
+database handle as it was created with. This may be done whether the
+previous transaction is live or dead.
+
+; txn : A transaction handle returned by (mdb-txn-begin)
+; cursor : A cursor handle returned by (mdb-cursor-open)
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-cursor-txn cursor)</procedure>
+Return the cursor's transaction handle.
+
+; cursor : A cursor handle returned by (mdb-cursor-open)
+
+<procedure>(mdb-cursor-dbi cursor)</procedure
+Return the cursor's database handle.
+
+; cursor : A cursor handle returned by (mdb-cursor-open)
+    
+<procedure>(mdb-cursor-key cursor)</procedure>
+Returns the key currently pointed to by cursor as a blob.
+
+<procedure>(mdb-cursor-data cursor)</procedure>
+Returns the data currently pointed to by cursor as a blob.
+
+<procedure>(mdb-cursor-get cursor key data op)</procedure>
+Retrieve by cursor.
+
+This procedure mostly follows the C API for mdb_cursor_get but does
+not modify the key and data paramters to return data - instead call
+(mdb-cursor-key) and (mdb-cursor-data) after this function to access
+the current key/data values for the cursor.
+
+; cursor : A cursor handle returned by (mdb-cursor-open)
+; key : The key to look up (if #f do not modify the cursors current key value)
+; data : The data to look up (useful for dupsort databases, if #f do not modify the cursors current value)
+; op : A cursor operation MDB_cursor_op (see Cursor Operatios in Constants)
+
+; (exn lmdb MDB_NOTFOUND) : no matching key found.
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-cursor-put cursor key data flags)</procedure>
+Store by cursor.
+
+This function stores key/data pairs into the database. The cursor is
+positioned at the new item, or on failure usually near it.
+
+; cursor : A cursor handle returned by (mdb-cursor-open)
+; key : The key to store.
+; data : The data to store.
+; flags : Options for this operation. This parameter must be set to 0 or one of the values described in the 'Put Flags' section in Constants.
+
+Some possible error conditions:
+
+; (exn lmdb MDB_MAP_FULL) : the database is full, see (mdb-env-set-mapsize).
+; (exn lmdb MDB_TXN_FULL) : the transaction has too many dirty pages.
+; (exn lmdb EACCES) : an attempt was made to write in a read-only transaction.
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-cursor-del cursor flags)</procedure>
+Delete current key/data pair.
+
+This function deletes the key/data pair to which the cursor refers.
+
+; cursor : A cursor handle returned by mdb_cursor_open()
+; flags : Options for this operation. This parameter must be set to 0 or one of the values described here.
+
+Flags:
+
+; MDB_NODUPDATA : delete all of the data items for the current key. This flag may only be specified if the database was opened with MDB_DUPSORT.
+
+Some possible error conditions:
+
+; (exn lmdb EACCES) : an attempt was made to write in a read-only transaction.
+; (exn lmdb EINVAL) : an invalid parameter was specified.
+
+<procedure>(mdb-cursor-count cursor)</procedure>
+Return count of duplicates for current key.
+
+This call is only valid on databases that support sorted duplicate
+data items MDB_DUPSORT.
+
+; cursor : A cursor handle returned by (mdb-cursor-open)
+
+Some possible error conditions:
+
+; (exn lmdb EINVAL) : cursor is not initialized, or an invalid parameter was specified.
+
+=== Records
+
+<record>mdb-stat</record>
+
+* psize
+* depth
+* branch-pages
+* leaf-pages
+* overflow-pages
+* entries
+
+<record>mdb-envinfo</record>
+
+* mapaddr
+* mapsize
+* last-pgno
+* last-txnid
+* maxreaders
+* numreaders
+
+<record>mdb-env</record>
+<record>mdb-txn</record>
+<record>mdb-dbi</record>
+<record>mdb-cursor</record>
+
+=== Constants
+
+==== Environment Flags
+
+<constant>MDB_FIXEDMAP</constant>
+Use a fixed address for the mmap region. This flag must be specified when creating the environment, and is stored persistently in the environment. If successful, the memory map will always reside at the same virtual address and pointers used to reference data items in the database will be constant across multiple invocations. This option may not always work, depending on how the operating system has allocated memory to shared libraries and other uses. The feature is highly experimental.
+
+<constant>MDB_NOSUBDIR</constant>
+By default, LMDB creates its environment in a directory whose pathname is given in path, and creates its data and lock files under that directory. With this option, path is used as-is for the database main data file. The database lock file is the path with "-lock" appended.
+
+<constant>MDB_NOSYNC</constant>
+Don't flush system buffers to disk when committing a transaction. This optimization means a system crash can corrupt the database or lose the last transactions if buffers are not yet flushed to disk. The risk is governed by how often the system flushes dirty buffers to disk and how often (mdb-env-sync) is called. However, if the filesystem preserves write order and the MDB_WRITEMAP flag is not used, transactions exhibit ACI (atomicity, consistency, isolation) properties and only lose D (durability). I.e. database integrity is maintained, but a system crash may undo the final transactions. Note that (MDB_NOSYNC | MDB_WRITEMAP) leaves the system with no hint for when to write transactions to disk, unless (mdb-env-sync) is called. (MDB_MAPASYNC | MDB_WRITEMAP) may be preferable. This flag may be changed at any time using (mdb-env-set-flags). 
+
+<constant>MDB_RDONLY</constant>
+Open the environment in read-only mode. No write operations will be allowed. LMDB will still modify the lock file - except on read-only filesystems, where LMDB does not use locks
+
+<constant>MDB_NOMETASYNC</constant>
+Flush system buffers to disk only once per transaction, omit the metadata flush. Defer that until the system flushes files to disk, or next non-MDB_RDONLY commit or (mdb-env-sync). This optimization maintains database integrity, but a system crash may undo the last committed transaction. I.e. it preserves the ACI (atomicity, consistency, isolation) but not D (durability) database property. This flag may be changed at any time using (mdb-env-set-flags).
+
+<constant>MDB_WRITEMAP</constant>
+Use a writeable memory map unless MDB_RDONLY is set. This is faster and uses fewer mallocs, but loses protection from application bugs like wild pointer writes and other bad updates into the database. Incompatible with nested transactions. Do not mix processes with and without MDB_WRITEMAP on the same environment. This can defeat durability (mdb-env-sync etc).
+
+<constant>MDB_MAPASYNC</constant>
+When using MDB_WRITEMAP, use asynchronous flushes to disk. As with MDB_NOSYNC, a system crash can then corrupt the database or lose the last transactions. Calling (mdb-env-sync) ensures on-disk database integrity until next commit. This flag may be changed at any time using (mdb-env-set-flags).
+
+<constant>MDB_NOTLS</constant>
+Don't use Thread-Local Storage. Tie reader locktable slots to MDB_txn objects instead of to threads. I.e. mdb_txn_reset() keeps the slot reseved for the MDB_txn object. A thread may use parallel read-only transactions. A read-only transaction may span threads if the user synchronizes its use. Applications that multiplex many user threads over individual OS threads need this option. Such an application must also serialize the write transactions in an OS thread, since LMDB's write locking is unaware of the user threads.
+
+<constant>MDB_NOLOCK</constant>
+Don't do any locking. If concurrent access is anticipated, the caller must manage all concurrency itself. For proper operation the caller must enforce single-writer semantics, and must ensure that no readers are using old transactions while a writer is active. The simplest approach is to use an exclusive lock so that no readers may be active at all when a writer begins.
+
+<constant>MDB_NORDAHEAD</constant>
+Turn off readahead. Most operating systems perform readahead on read requests by default. This option turns it off if the OS supports it. Turning it off may help random read performance when the DB is larger than RAM and system RAM is full. The option is not implemented on Windows.
+
+<constant>MDB_NOMEMINIT</constant>
+Don't initialize malloc'd memory before writing to unused spaces in the data file. By default, memory for pages written to the data file is obtained using malloc. While these pages may be reused in subsequent transactions, freshly malloc'd pages will be initialized to zeroes before use. This avoids persisting leftover data from other code (that used the heap and subsequently freed the memory) into the data file. Note that many other system libraries may allocate and free memory from the heap for arbitrary uses. E.g., stdio may use the heap for file I/O buffers. This initialization step has a modest performance cost so some applications may want to disable it using this flag. This option can be a problem for applications which handle sensitive data like passwords, and it makes memory checkers like Valgrind noisy. This flag is not needed with MDB_WRITEMAP, which writes directly to the mmap instead of using malloc for pages. The initialization is also skipped if MDB_RESERVE is used; the caller is expected to overwrite all of the memory that was reserved in that case. This flag may be changed at any time using (mdb-env-set-flags).
+
+==== Return Codes
+
+These are some of the possible return codes used by the C API.
+'''NOTE:''' You do not need to check return codes when using this egg,
+anything other than MDB_SUCCESS will be raised as an (exn lmdb
+RETURN_CODE) condition.
+
+<constant>MDB_SUCCESS</constant>
+Successful result.
+
+<constant>MDB_KEYEXIST</constant>
+key/data pair already exists.
+
+<constant>MDB_NOTFOUND</constant>
+key/data pair not found (EOF)
+
+<constant>MDB_PAGE_NOTFOUND</constant>
+Requested page not found - this usually indicates corruption
+
+<constant>MDB_CORRUPTED</constant>
+Located page was wrong type
+
+<constant>MDB_PANIC</constant>
+Update of meta page failed or environment had fatal error
+
+<constant>MDB_VERSION_MISMATCH</constant>
+Environment version mismatch
+
+<constant>MDB_INVALID</constant>
+File is not a valid LMDB file
+
+<constant>MDB_MAP_FULL</constant>
+Environment mapsize reached
+
+<constant>MDB_DBS_FULL</constant>
+Environment maxdbs reached
+
+<constant>MDB_READERS_FULL</constant>
+Environment maxreaders reached
+
+<constant>MDB_TLS_FULL</constant>
+Too many TLS keys in use - Windows only
+
+<constant>MDB_TXN_FULL</constant>
+Txn has too many dirty pages
+
+<constant>MDB_CURSOR_FULL</constant>
+Cursor stack too deep - internal error
+
+<constant>MDB_PAGE_FULL</constant>
+Page has not enough space - internal error
+
+<constant>MDB_MAP_RESIZED</constant>
+Database contents grew beyond environment mapsize
+
+<constant>MDB_INCOMPATIBLE</constant>
+Operation and DB incompatible, or DB type changed. This can mean:
+
+- The operation expects an MDB_DUPSORT / MDB_DUPFIXED database.
+- Opening a named DB when the unnamed DB has MDB_DUPSORT / MDB_INTEGERKEY.
+- Accessing a data record as a database, or vice versa.
+- The database was dropped and recreated with different flags.
+
+<constant>MDB_BAD_RSLOT</constant>
+Invalid reuse of reader locktable slot
+
+<constant>MDB_BAD_TXN</constant>
+Transaction must abort, has a child, or is invalid
+
+<constant>MDB_BAD_VALSIZE</constant>
+Unsupported size of key/DB name/data, or wrong DUPFIXED size
+
+<constant>MDB_BAD_DBI</constant>
+The specified DBI was changed unexpectedly
+
+<constant>ENOENT</constant>
+<constant>EACCES</constant>
+<constant>EAGAIN</constant>
+<constant>ENOMEM</constant>
+<constant>EINVAL</constant>
+<constant>ENOSPC</constant>
+<constant>EIO</constant>
+
+==== Copy Flags
+
+<constant>MDB_CP_COMPACT</constant>
+Perform compaction while copying: omit free pages and sequentially renumber all pages in output. This option consumes more CPU and runs more slowly than the default.
+
+==== Database Flags
+
+<constant>MDB_REVERSEKEY</constant>
+Keys are strings to be compared in reverse order, from the end of the strings to the beginning. By default, Keys are treated as strings and compared from beginning to end.
+
+<constant>MDB_DUPSORT</constant>
+Duplicate keys may be used in the database. (Or, from another perspective, keys may have multiple data items, stored in sorted order.) By default keys must be unique and may have only a single data item.
+
+<constant>MDB_INTEGERKEY</constant>
+Keys are binary integers in native byte order, either unsigned int or size_t, and will be sorted as such. The keys must all be of the same size.
+
+<constant>MDB_DUPFIXED</constant>
+This flag may only be used in combination with MDB_DUPSORT. This option tells the library that the data items for this database are all the same size, which allows further optimizations in storage and retrieval. When all data items are the same size, the MDB_GET_MULTIPLE and MDB_NEXT_MULTIPLE cursor operations may be used to retrieve multiple items at once.
+
+<constant>MDB_INTEGERDUP</constant>
+This option specifies that duplicate data items are binary integers, similar to MDB_INTEGERKEY keys.
+
+<constant>MDB_REVERSEDUP</constant>
+This option specifies that duplicate data items should be compared as strings in reverse order.
+
+<constant>MDB_CREATE</constant>
+Create the named database if it doesn't exist. This option is not allowed in a read-only transaction or a read-only environment. 
+
+==== Put flags
+
+<constant>MDB_CURRENT</constant>
+replace the item at the current cursor position. The key parameter must still be provided, and must match it. If using sorted duplicates (MDB_DUPSORT) the data item must still sort into the same place. This is intended to be used when the new data is the same size as the old. Otherwise it will simply perform a delete of the old record followed by an insert.
+
+<constant>MDB_NODUPDATA</constant>
+enter the new key/data pair only if it does not already appear in the database. This flag may only be specified if the database was opened with MDB_DUPSORT. The function will return MDB_KEYEXIST if the key/data pair already appears in the database.
+
+<constant>MDB_NOOVERWRITE</constant>
+enter the new key/data pair only if the key does not already appear in the database. The function will return MDB_KEYEXIST if the key already appears in the database, even if the database supports duplicates (MDB_DUPSORT).
+
+<constant>MDB_RESERVE</constant>
+reserve space for data of the given size, but don't copy the given data. Instead, return a pointer to the reserved space, which the caller can fill in later. This saves an extra memcpy if the data is being generated later. This flag must not be specified if the database was opened with MDB_DUPSORT.
+
+<constant>MDB_APPEND</constant>
+append the given key/data pair to the end of the database. No key comparisons are performed. This option allows fast bulk loading when keys are already known to be in the correct order. Loading unsorted keys with this flag will cause a MDB_KEYEXIST error.
+ 
+<constant>MDB_APPENDDUP</constant>
+as above, but for sorted dup data.
+
+<constant>MDB_MULTIPLE</constant>
+store multiple contiguous data elements in a single request. This flag may only be specified if the database was opened with MDB_DUPFIXED. The data argument must be an array of two MDB_vals. The mv_size of the first MDB_val must be the size of a single data element. The mv_data of the first MDB_val must point to the beginning of the array of contiguous data elements. The mv_size of the second MDB_val must be the count of the number of data elements to store. On return this field will be set to the count of the number of elements actually written. The mv_data of the second MDB_val is unused.
+
+==== Cursor operations
+
+<constant>MDB_FIRST</constant>
+Position at first key/data item
+
+<constant>MDB_FIRST_DUP</constant>
+Position at first data item of current key. Only for MDB_DUPSORT
+
+<constant>MDB_GET_BOTH</constant>
+Position at key/data pair. Only for MDB_DUPSORT
+
+<constant>MDB_GET_BOTH_RANGE</constant>
+position at key, nearest data. Only for MDB_DUPSORT
+
+<constant>MDB_GET_CURRENT</constant>
+Return key/data at current cursor position
+
+<constant>MDB_GET_MULTIPLE</constant>
+Return key and up to a page of duplicate data items from current cursor position. Move cursor to prepare for MDB_NEXT_MULTIPLE. Only for MDB_DUPFIXED
+
+<constant>MDB_LAST</constant>
+Position at last key/data item
+
+<constant>MDB_LAST_DUP</constant>
+Position at last data item of current key. Only for MDB_DUPSORT
+
+<constant>MDB_NEXT</constant>
+Position at next data item
+
+<constant>MDB_NEXT_DUP</constant>
+Position at next data item of current key. Only for MDB_DUPSORT
+
+<constant>MDB_NEXT_MULTIPLE</constant>
+Return key and up to a page of duplicate data items from next cursor position. Move cursor to prepare for MDB_NEXT_MULTIPLE. Only for MDB_DUPFIXED
+
+<constant>MDB_NEXT_NODUP</constant>
+Position at first data item of next key
+
+<constant>MDB_PREV</constant>
+Position at previous data item
+
+<constant>MDB_PREV_DUP</constant>
+Position at previous data item of current key. Only for MDB_DUPSORT
+
+<constant>MDB_PREV_NODUP</constant>
+Position at last data item of previous key
+
+<constant>MDB_SET</constant>
+Position at specified key
+
+<constant>MDB_SET_KEY</constant>
+Position at specified key, return key + data
+
+<constant>MDB_SET_RANGE</constant>
+Position at first key greater than or equal to specified key.
+
+==== Exceptions
+
+You do not need to check return codes, as in the C API, this is handled automatically and any error codes are raised as conditions of the form (exn lmdb CODE). For example: (exn lmdb MDB_NOTFOUND).
+
+=== Examples
+
+==== Basic put/get
+
+<enscript highlight="scheme">
+(use lmdb-lolevel)
+
+(let ((env (mdb-env-create)))
+  (mdb-env-open env "testdb" 0 (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+  (let* ((txn (mdb-txn-begin env #f 0))
+         (dbi (mdb-dbi-open txn #f 0)))
+    (mdb-put txn dbi (string->blob "foo") (string->blob "bar") 0)
+    (print (mdb-get txn dbi (string->blob "foo")))
+    (mdb-txn-commit txn))
+  (mdb-env-close env))
+</enscript>
+
+==== Using a cursor to iterate over all keys
+
+<enscript highlight="scheme">
+(use lmdb-lolevel)
+
+(let ((env (mdb-env-create)))
+  (mdb-env-open env "testdb" 0 (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+  (let* ((txn (mdb-txn-begin env #f 0))
+         (dbi (mdb-dbi-open txn #f 0))
+	 (cursor (mdb-cursor-open txn dbi)))
+    (condition-case
+      (let loop ((op MDB_FIRST))
+        (mdb-cursor-get cursor #f #f op)
+	(print (mdb-cursor-key cursor))
+	(loop MDB_NEXT))
+      ((exn lmdb MDB_NOTFOUND) 'done))
+    (mdb-txn-commit txn))
+  (mdb-env-close env))
+</enscript>
+
+==== Defining a custom sort function in C
+
+This example will sort keys by length. Keys of equal length are sorted using memcmp.
+
+<enscript highlight="scheme">
+(foreign-declare
+ "int custom_compare(const MDB_val *a, const MDB_val *b) {
+    if (a->mv_size == b->mv_size) {
+      return memcmp(a->mv_data, b->mv_data, a->mv_size);
+    }
+    return a->mv_size - b->mv_size;
+  }")
+
+;; get a reference to the C function
+(define custom_compare
+  (foreign-value "&custom_compare"
+		 (function int ((const (c-pointer (struct MDB_val)))
+				(const (c-pointer (struct MDB_val)))))))
+
+;; open database using custom_compare as sort function
+(let ((env (mdb-env-create)))
+  (mdb-env-open env "testdb" 0 (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
+  (let* ((txn (mdb-txn-begin env #f 0))
+         (dbi (mdb-dbi-open txn #f 0)))
+    (mdb-set-compare txn dbi custom_compare)
+    ;; use dbi
+    (mdb-txn-commit txn))
+  (mdb-env-close env))
+</enscript>
+
+=== Source code / issues
+
+[[https://github.com/caolan/lmdb-lolevel]]
+
+=== Changelog
+
+==== 1.0.0
+
+* Initial release
