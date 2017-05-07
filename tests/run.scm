@@ -1,5 +1,11 @@
 (use test test-generative data-generators lmdb-lolevel posix)
 
+
+;; LMDB does not work RDONLY on OpenBSD and should be used in MDB_WRITEMAP mode
+(define openbsd (string=? (car (system-information)) "OpenBSD"))
+(define env-flags (if openbsd MDB_WRITEMAP 0))
+
+
 (define (clear-testdb)
   (when (file-exists? "tests/testdb")
     (delete-directory "tests/testdb" #t))
@@ -16,7 +22,7 @@
     (test "mdb-env-open for missing directory"
 	  'fail
 	  (condition-case
-	      (mdb-env-open env "tests/missingdb" 0
+	      (mdb-env-open env "tests/missingdb" env-flags
 			    (bitwise-ior perm/irusr
 					 perm/iwusr
 					 perm/irgrp
@@ -27,7 +33,7 @@
 (test-group "basic put/get in same transaction"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -39,7 +45,7 @@
 (test-group "basic put/get in separate transactions"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -54,7 +60,7 @@
 (test-group "not found error condition"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -67,7 +73,7 @@
 (test-group "abort transaction"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -89,7 +95,7 @@
 (test-group "check invalid pointer tags"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -155,7 +161,7 @@
 (test-group "copy environment to filename"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -168,7 +174,7 @@
     (mdb-env-copy env "tests/testdb2")
     (mdb-env-close env))
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb2" 0
+    (mdb-env-open env "tests/testdb2" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -180,7 +186,7 @@
 (test-group "copy environment to fd"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -198,7 +204,7 @@
       (file-close fd))
     (mdb-env-close env))
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb2" 0
+    (mdb-env-open env "tests/testdb2" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -210,7 +216,7 @@
 (test-group "copy environment to filename with compaction"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -230,7 +236,7 @@
     (mdb-env-copy2 env "tests/testdb2" MDB_CP_COMPACT)
     (mdb-env-close env))
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb2" 0
+    (mdb-env-open env "tests/testdb2" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -238,13 +244,14 @@
       (test (string->blob "two") (mdb-get txn dbi (string->blob "bar")))
       (mdb-txn-commit txn))
     (mdb-env-close env))
-  (test-assert (> (file-size "tests/testdb/data.mdb")
-		  (file-size "tests/testdb2/data.mdb"))))
+  (unless (= (bitwise-and MDB_WRITEMAP env-flags) MDB_WRITEMAP)
+    (test-assert (> (file-size "tests/testdb/data.mdb")
+ 		    (file-size "tests/testdb2/data.mdb")))))
 
 (test-group "copy environment to fd with compaction"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -269,7 +276,7 @@
       (file-close fd))
     (mdb-env-close env))
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb2" 0
+    (mdb-env-open env "tests/testdb2" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -277,13 +284,14 @@
       (test (string->blob "two") (mdb-get txn dbi (string->blob "bar")))
       (mdb-txn-commit txn))
     (mdb-env-close env))
-  (test-assert (> (file-size "tests/testdb/data.mdb")
-		  (file-size "tests/testdb2/data.mdb"))))
+  (unless (= (bitwise-and MDB_WRITEMAP env-flags) MDB_WRITEMAP)
+    (test-assert (> (file-size "tests/testdb/data.mdb")
+                    (file-size "tests/testdb2/data.mdb")))))
 
 (test-group "mdb-env-stat"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -303,7 +311,7 @@
 (test-group "mdb-env-info"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -322,7 +330,7 @@
 (test-group "mdb-env-sync"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" MDB_NOSYNC
+    (mdb-env-open env "tests/testdb" (bitwise-ior env-flags MDB_NOSYNC)
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -351,7 +359,7 @@
 (test-group "mdb-env-get-path"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (test "tests/testdb" (mdb-env-get-path env))
     (mdb-env-close env)))
@@ -359,15 +367,15 @@
 (test-group "mdb-env-get-fd"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (test-assert (number? (mdb-env-get-fd env)))
     (mdb-env-close env)))
 
-(test-group "mdb-env-setmapsize"
+(test-group "mdb-env-set-mapsize"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     ;; no asserts, just checking this runs without an exception for now
     (mdb-env-set-mapsize env (* 2 10485760))
@@ -385,7 +393,7 @@
   (clear-testdb)
   (let ((env (mdb-env-create)))
     (mdb-env-set-maxdbs env 2)
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     ;; this would normally cause MDB_DBS_FULL error
     (let* ((txn (mdb-txn-begin env #f 0))
@@ -404,7 +412,7 @@
 (test-group "mdb-txn-env"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" MDB_NOSYNC
+    (mdb-env-open env "tests/testdb" (bitwise-ior env-flags MDB_NOSYNC)
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let ((txn (mdb-txn-begin env #f 0)))
       (test env (mdb-txn-env txn))
@@ -421,7 +429,7 @@
   (test-group "mdb-txn-id"
     (clear-testdb)
     (let ((env (mdb-env-create)))
-      (mdb-env-open env "tests/testdb" MDB_NOSYNC
+      (mdb-env-open env "tests/testdb" (bitwise-ior env-flags MDB_NOSYNC)
   		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
       (let ((txn (mdb-txn-begin env #f 0)))
         (test-assert (number? (mdb-txn-id txn)))
@@ -431,7 +439,7 @@
 (test-group "mdb-txn-reset / mdb-txn-renew"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" MDB_NOSYNC
+    (mdb-env-open env "tests/testdb" (bitwise-ior env-flags MDB_NOSYNC)
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -450,7 +458,7 @@
 (test-group "mdb-stat"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0))
@@ -468,7 +476,7 @@
 (test-group "mdb-dbi-flags"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f MDB_REVERSEKEY)))
@@ -481,7 +489,7 @@
   (clear-testdb)
   (let ((env (mdb-env-create)))
     (mdb-env-set-maxdbs env 2)
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi1 (mdb-dbi-open txn "one" MDB_CREATE))
@@ -532,7 +540,7 @@
    (test-group "set compare"
      (clear-testdb)
      (let ((env (mdb-env-create)))
-       (mdb-env-open env "tests/testdb" 0
+       (mdb-env-open env "tests/testdb" env-flags
 		     (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
        (let* ((txn (mdb-txn-begin env #f 0))
 	      (dbi (mdb-dbi-open txn #f 0))
@@ -551,7 +559,7 @@
    (test-group "set dupsort"
      (clear-testdb)
      (let ((env (mdb-env-create)))
-       (mdb-env-open env "tests/testdb" 0
+       (mdb-env-open env "tests/testdb" env-flags
 		     (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
        (let* ((txn (mdb-txn-begin env #f 0))
 	      (dbi (mdb-dbi-open txn #f MDB_DUPSORT))
@@ -571,7 +579,7 @@
 (test-group "mdb-del"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -600,7 +608,7 @@
 (test-group "cursor txn / dbi"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0))
@@ -614,7 +622,7 @@
 (test-group "readonly txn and renew cursor"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -633,7 +641,7 @@
 (test-group "cursor get"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0))
@@ -656,7 +664,7 @@
 (test-group "cursor put"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0))
@@ -676,7 +684,7 @@
 (test-group "cursor del"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0))
@@ -697,7 +705,7 @@
 (test-group "cursor count"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f MDB_DUPSORT))
@@ -715,7 +723,7 @@
 (test-group "cmp / dcmp"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f MDB_DUPSORT)))
@@ -735,7 +743,7 @@
 (test-group "reader list"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0))
@@ -751,7 +759,7 @@
 (test-group "reader check"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f 0)))
@@ -762,7 +770,7 @@
 (test-group "throw some random data at it"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" MDB_NOSYNC
+    (mdb-env-open env "tests/testdb" (bitwise-ior env-flags MDB_NOSYNC)
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let ((max-key-size (mdb-env-get-maxkeysize env)))
       (parameterize
@@ -783,7 +791,7 @@
 (test-group "iterate over dupsort data"
   (clear-testdb)
   (let ((env (mdb-env-create)))
-    (mdb-env-open env "tests/testdb" 0
+    (mdb-env-open env "tests/testdb" env-flags
 		  (bitwise-ior perm/irusr perm/iwusr perm/irgrp perm/iroth))
     (let* ((txn (mdb-txn-begin env #f 0))
 	   (dbi (mdb-dbi-open txn #f MDB_DUPSORT))
