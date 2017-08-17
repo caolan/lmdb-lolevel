@@ -4,4 +4,4 @@
 (install-extension
   'lmdb-lolevel
   '("lmdb-lolevel.so" "lmdb-lolevel.import.so")
-  '((version "1.0.0")))
+  '((version "1.1.0")))
