@@ -1155,7 +1155,7 @@
                           mapsize
                           maxdbs
                           maxreaders
-                          flags
+                          (flags 0)
                           (mode (bitwise-ior
                                  perm/irusr
                                  perm/iwusr
@@ -1172,14 +1172,15 @@
           (hash-table-delete! mutexes env))
         (mdb-env-close env)
         (abort exn))
-      (begin0
+      (begin
         (mdb-env-open env path flags mode)
-        (thunk env)
-        (when (hash-table-exists? mutexes env)
-          ;; wait for writes to finish
-          (mutex-lock! (hash-table-ref mutexes env))
-          (hash-table-delete! mutexes env))
-        (mdb-env-close env)))))
+        (let ((result (thunk env)))
+          (when (hash-table-exists? mutexes env)
+            ;; wait for writes to finish
+            (mutex-lock! (hash-table-ref mutexes env))
+            (hash-table-delete! mutexes env))
+          (mdb-env-close env)
+          result)))))
 
 (define (mdb-cursor-get/default cursor key data op default)
   (condition-case

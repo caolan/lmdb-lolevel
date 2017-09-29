@@ -2,4 +2,5 @@
  (author "Caolan McMahon")
  (category db)
  (license "BSD")
+ (depends miscmacros)
  (test-depends test test-generative data-generators))
